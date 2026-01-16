@@ -1,0 +1,73 @@
+# CURL COMMANDS TO TEST BACKEND
+
+# ============================================
+# 1. TEST HEALTH ENDPOINT
+# ============================================
+curl http://localhost:3000/api/health
+
+
+# ============================================
+# 2. TEST KICK + ALL (Minimal Config)
+# ============================================
+curl -X POST http://localhost:3000/api/configure ^
+  -H "Content-Type: application/json" ^
+  -H "bypass-tunnel-reminder: true" ^
+  -d "{\"kickmode\": true, \"imprisonmode\": false, \"modena\": false, \"kickall\": true, \"kickbybl\": false, \"dadplus\": false}"
+
+
+# ============================================
+# 3. TEST FULL CONFIG (What UI Actually Sends)
+# ============================================
+curl -X POST http://localhost:3000/api/configure ^
+  -H "Content-Type: application/json" ^
+  -H "bypass-tunnel-reminder: true" ^
+  -d "{\"rc1\": \"code1\", \"rc2\": \"code2\", \"rc3\": \"\", \"rc4\": \"\", \"rc5\": \"\", \"kickrc\": \"kickcode\", \"rcl1\": \"\", \"rcl2\": \"\", \"rcl3\": \"\", \"rcl4\": \"\", \"rcl5\": \"\", \"planet\": \"TestPlanet\", \"device\": \"312\", \"autorelease\": false, \"smart\": false, \"lowsecmode\": false, \"exitting\": true, \"sleeping\": false, \"kickmode\": true, \"imprisonmode\": false, \"blacklist\": \"\", \"gangblacklist\": \"\", \"kblacklist\": \"\", \"kgangblacklist\": \"\", \"attack1\": 1940, \"attack2\": 1940, \"attack3\": 1940, \"attack4\": 1940, \"attack5\": 1940, \"waiting1\": 1910, \"waiting2\": 1910, \"waiting3\": 1910, \"waiting4\": 1910, \"waiting5\": 1910, \"timershift\": false, \"incrementvalue\": 10, \"decrementvalue\": 10, \"minatk\": 1000, \"maxatk\": 3000, \"mindef\": 1000, \"maxdef\": 3000, \"modena\": false, \"kickbybl\": false, \"dadplus\": false, \"kickall\": true, \"reconnect\": 5000, \"aiMode\": false}"
+
+
+# ============================================
+# 4. TEST RELEASE ENDPOINT
+# ============================================
+curl -X POST http://localhost:3000/api/release ^
+  -H "Content-Type: application/json" ^
+  -H "bypass-tunnel-reminder: true"
+
+
+# ============================================
+# 5. TEST CONNECT ENDPOINT
+# ============================================
+curl -X POST http://localhost:3000/api/connect ^
+  -H "Content-Type: application/json" ^
+  -H "bypass-tunnel-reminder: true"
+
+
+# ============================================
+# 6. TEST DISCONNECT ENDPOINT
+# ============================================
+curl -X POST http://localhost:3000/api/disconnect ^
+  -H "Content-Type: application/json" ^
+  -H "bypass-tunnel-reminder: true"
+
+
+# ============================================
+# 7. TEST STATUS ENDPOINT
+# ============================================
+curl http://localhost:3000/api/status
+
+
+# ============================================
+# 8. TEST LOGS ENDPOINT
+# ============================================
+curl http://localhost:3000/api/logs
+
+
+# ============================================
+# EXPECTED RESPONSES
+# ============================================
+
+# Health: {"status":"ok"} or {"status":"healthy"}
+# Configure: {"success":true,"message":"Configuration updated"}
+# Release: {"success":true,"message":"Released all players"}
+# Connect: {"success":true,"message":"Connected"}
+# Disconnect: {"success":true,"message":"Disconnected"}
+# Status: {"connected":false,"wsStatus":{...},"logs":[...]}
+# Logs: ["log1","log2",...]

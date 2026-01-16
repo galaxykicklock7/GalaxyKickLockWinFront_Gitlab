@@ -1,0 +1,105 @@
+.header {
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 2px solid #555;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  color: white;
+  text-align: center;
+  grid-column: 2;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  grid-column: 3;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.status-label {
+  color: #bbb;
+  font-weight: 500;
+}
+
+.status-text {
+  font-weight: 600;
+  color: white;
+}
+
+.ws-active {
+  color: #4caf50;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.ws-inactive {
+  color: #f44336;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.error-message {
+  color: #ff5252;
+  font-size: 13px;
+  padding: 8px 0;
+  background-color: transparent;
+  border-radius: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.username {
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.logout-button {
+  padding: 6px 16px;
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(244, 67, 54, 0.4);
+}
+
+.logout-button:active {
+  transform: translateY(0);
+}

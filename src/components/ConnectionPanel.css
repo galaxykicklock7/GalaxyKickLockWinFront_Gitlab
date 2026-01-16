@@ -1,0 +1,250 @@
+.connection-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.codes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.code-row-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.code-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr 80px 80px;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  color: #2196F3;
+}
+
+.code-label-with-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.ws-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ws-connected {
+  background-color: #4caf50;
+  box-shadow: 0 0 8px #4caf50;
+  animation: blink-green 2s infinite;
+}
+
+.ws-disconnected {
+  background-color: #f44336;
+  animation: blink-red 2s infinite;
+}
+
+@keyframes blink-green {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes blink-red {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.code-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 80px 80px;
+  gap: 5px;
+  align-items: center;
+}
+
+.code-row input[type="text"] {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  /* Increased from 4px 5px */
+  box-sizing: border-box;
+}
+
+.code-row .timer-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  /* Increased from 4px 5px */
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 5px;
+  margin: 8px 0;
+}
+
+.controls .btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.connection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.planet-fly-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px;
+  align-items: center;
+}
+
+.planet-fly-row input {
+  font-size: 12px;
+  padding: 7px 10px;
+  /* Increased from 5px 7px */
+}
+
+.planet-fly-row .btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.connection-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.connection-panel .form-group {
+  margin-bottom: 0;
+}
+
+.connection-panel .form-group label {
+  font-size: 12px;
+  margin-bottom: 3px;
+  display: block;
+  font-weight: 500;
+}
+
+.connection-panel .form-group input {
+  font-size: 12px;
+  padding: 7px 10px;
+  /* Increased from 5px 7px */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.planet-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px;
+  align-items: center;
+}
+
+.planet-control input {
+  font-size: 12px;
+  padding: 5px 7px;
+  min-width: 0;
+}
+
+.planet-control .btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.button-row .btn {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 12px;
+  background-color: rgba(33, 150, 243, 0.2);
+  border: 1px solid #2196F3;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.button-row .btn:hover:not(:disabled) {
+  background-color: rgba(33, 150, 243, 0.4);
+}
+
+.button-row .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.connection-panel .form-group button {
+  padding: 6px 12px;
+  font-size: 12px;
+  background-color: rgba(33, 150, 243, 0.2);
+  border: 1px solid #2196F3;
+  color: white;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.connection-panel .form-group button:hover:not(:disabled) {
+  background-color: rgba(33, 150, 243, 0.4);
+}
+
+.connection-panel .form-group button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.device-selection {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.device-selection label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin: 0;
+  cursor: pointer;
+}

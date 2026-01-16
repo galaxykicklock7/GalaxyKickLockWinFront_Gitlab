@@ -1,0 +1,150 @@
+# ========================================
+# BEST BACKEND API - CONNECTION GUIDE
+# ========================================
+
+# BACKEND URL OPTIONS:
+# 1. LocalTunnel (GitHub Actions): https://best-backend.loca.lt
+# 2. Localhost (Codespaces/Local): http://localhost:3000
+# 3. Codespaces Port Forward: https://your-codespace-url-3000.app.github.dev
+
+# IMPORTANT: For LocalTunnel, add this header to bypass reminder page:
+# -H "bypass-tunnel-reminder: true"
+
+# ========================================
+# STEP 1: CONFIGURE (Set all settings)
+# ========================================
+
+curl -X POST https://best-backend.loca.lt/api/configure \
+  -H "Content-Type: application/json" \
+  -H "bypass-tunnel-reminder: true" \
+  -d '{
+  "rc1": "onfoqk2ff1",
+  "rc2": "",
+  "rc3": "",
+  "rc4": "",
+  "kickrc": "",
+  "rcl1": "",
+  "rcl2": "",
+  "rcl3": "",
+  "rcl4": "",
+  "planet": "THE_BOT",
+  "device": "312",
+  "autorelease": true,
+  "exitting": true,
+  "blacklist": "AkaZa_",
+  "gangblacklist": "",
+  "kblacklist": "",
+  "kgangblacklist": "",
+  "sleeping": true,
+  "smart": true,
+  "lowsecmode": false,
+  "kickmode": true,
+  "modena": false,
+  "kickbybl": true,
+  "dadplus": false,
+  "kickall": false,
+  "attack1": 1700,
+  "attack2": 1940,
+  "attack3": 1940,
+  "attack4": 1940,
+  "waiting1": 1725,
+  "waiting2": 1910,
+  "waiting3": 1910,
+  "waiting4": 1910,
+  "timershift": false,
+  "incrementvalue": 5,
+  "decrementvalue": 5,
+  "minatk": 1000,
+  "maxatk": 3000,
+  "mindef": 1000,
+  "maxdef": 3000,
+  "reconnect": 500
+}'
+
+# ========================================
+# STEP 2: CONNECT (Start WebSockets)
+# ========================================
+
+curl -X POST https://best-backend.loca.lt/api/connect \
+  -H "Content-Type: application/json" \
+  -H "bypass-tunnel-reminder: true"
+
+# ========================================
+# OPTIONAL: CHECK STATUS
+# ========================================
+
+curl https://best-backend.loca.lt/api/status \
+  -H "bypass-tunnel-reminder: true"
+
+# ========================================
+# OPTIONAL: VIEW LOGS
+# ========================================
+
+curl https://best-backend.loca.lt/api/logs \
+  -H "bypass-tunnel-reminder: true"
+
+# ========================================
+# OPTIONAL: DISCONNECT
+# ========================================
+
+curl -X POST https://best-backend.loca.lt/api/disconnect \
+  -H "Content-Type: application/json" \
+  -H "bypass-tunnel-reminder: true"
+
+# ========================================
+# KEY FEATURES YOU MIGHT HAVE MISSED:
+# ========================================
+
+# 1. MULTIPLE RECOVERY CODES:
+#    - rc1-4: Main attack accounts (WebSocket 1-4)
+#    - rcl1-4: Alternative attack accounts (WebSocket 1-4)
+#    - kickrc: Separate kick account (WebSocket 5)
+#    - You can run up to 5 accounts simultaneously!
+
+# 2. TIMER SHIFT (Auto-optimization):
+#    - Set "timershift": true to enable
+#    - Automatically adjusts attack/waiting timings based on success
+#    - Increments on 3-second events, decrements on success
+#    - Uses incrementvalue/decrementvalue for adjustment steps
+#    - Respects minatk/maxatk and mindef/maxdef boundaries
+
+# 3. AUTO-RECONNECT (Sleeping mode):
+#    - Set "sleeping": true to enable
+#    - Automatically reconnects after "reconnect" milliseconds
+#    - Useful for continuous operation without manual intervention
+
+# 4. KICK MODE (Separate account):
+#    - Requires "kickrc" (separate recovery code)
+#    - Set "kickmode": true to enable
+#    - Options:
+#      * "kickall": true - Kicks everyone who joins
+#      * "kickbybl": true - Kicks based on blacklists
+#    - Uses "kblacklist" and "kgangblacklist" for kick targets
+#    - Also checks "blacklist" and "gangblacklist" when kickbybl=true
+
+# 5. LOW SEC MODE:
+#    - Set "lowsecmode": true
+#    - Inverts blacklist logic (attacks non-whitelisted users)
+#    - Useful for defending specific areas
+
+# 6. PRISON AUTO-ESCAPE:
+#    - Set "autorelease": true
+#    - Automatically escapes prison using diamond (premium) or free method
+#    - Rejoins target planet after escape
+
+# 7. MULTIPLE ATTACK MODES:
+#    - Normal attack: Targets from 353 user list
+#    - JOIN attack: Immediate attack when target joins
+#    - Defense mode: Uses waiting timing for gang members
+#    - Target tracking: Builds pool of targets over time
+
+# ========================================
+# LOCALHOST EXAMPLE (for Codespaces):
+# ========================================
+
+# curl -X POST http://localhost:3000/api/configure \
+#   -H "Content-Type: application/json" \
+#   -d '{ ... same config ... }'
+#
+# curl -X POST http://localhost:3000/api/connect \
+#   -H "Content-Type: application/json"

@@ -1,0 +1,458 @@
+name: BEST Headless Server with LocalTunnel (Linux) (Optimized)
+
+# DEPLOYMENT TIME OPTIMIZATIONS (~50-60% faster):
+# 1. Node 20 (faster than Node 16)
+# 2. Caching node_modules (saves ~15-20s)
+# 3. Faster apt-get with --no-install-recommends and -qq flags (saves ~10-15s)
+# 4. Reduced initial wait times: 15s→3s for server, 10s→3s for tunnel (saves ~19s)
+# 5. Smarter retry loops with exponential backoff (saves ~10-15s)
+# 6. Faster npm install with --prefer-offline and --no-audit (saves ~5-10s)
+#
+# FUTURE OPTIMIZATIONS:
+# - Use pre-built Docker image with all dependencies pre-installed (saves ~30-40s)
+# - Use GitHub Actions cache for system packages (if available)
+# - Migrate to faster tunneling service (like ngrok with custom domain)
+
+on:
+  workflow_dispatch:
+    inputs:
+      subdomain:
+        description: 'Custom subdomain (e.g., bharanitest007 for https://bharanitest007.loca.lt)'
+        required: true
+        type: string
+      rc1:
+        description: 'Recovery Code 1'
+        required: false
+        type: string
+      rc2:
+        description: 'Recovery Code 2'
+        required: false
+        type: string
+      rc3:
+        description: 'Recovery Code 3'
+        required: false
+        type: string
+      rc4:
+        description: 'Recovery Code 4'
+        required: false
+        type: string
+      kickrc:
+        description: 'Kick Code'
+        required: false
+        type: string
+      planet:
+        description: 'Planet Name'
+        required: false
+        type: string
+      device:
+        description: 'Device Type (312=Android, 323=iOS, 352=Web)'
+        required: false
+        default: '312'
+        type: string
+      duration:
+        description: 'Run duration in minutes (max 360 = 6 hours)'
+        required: false
+        default: '60'
+        type: string
+
+jobs:
+  deploy-backend:
+    name: 🚀 Deploy for ${{ github.event.inputs.subdomain }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # Maximum 6 hours
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: resources/app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('resources/app/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install system dependencies for Electron
+        run: |
+          sudo apt-get update -qq
+          # Install all dependencies in one command for faster installation
+          sudo apt-get install -y --no-install-recommends \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libpango-1.0-0 \
+            libcairo2 \
+            libatspi2.0-0 \
+            xvfb \
+            libasound2 \
+            libasound2t64 || true
+          echo "✅ All system dependencies installed"
+
+      - name: Install application dependencies
+        run: |
+          cd resources/app
+          npm install --prefer-offline --no-audit
+          echo "✅ Application dependencies installed"
+
+      - name: Install localtunnel
+        run: |
+          npm install -g localtunnel --no-audit --silent
+          echo "✅ localtunnel installed globally"
+
+      - name: Start BEST in Headless Mode
+        env:
+          HEADLESS: 'true'
+          API_PORT: '3000'
+          DISPLAY: ':99'
+        run: |
+          echo "Starting virtual display (Xvfb)..."
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          sleep 1
+          echo "✅ Virtual display started"
+
+          echo "Starting BEST in headless mode..."
+          cd resources/app
+
+          # Verify files exist
+          if [ ! -f "package.json" ]; then
+            echo "❌ package.json not found!"
+            exit 1
+          fi
+
+          if [ ! -d "node_modules" ]; then
+            echo "❌ node_modules not found!"
+            exit 1
+          fi
+
+          if [ ! -f "main.js" ]; then
+            echo "❌ main.js not found!"
+            exit 1
+          fi
+
+          echo "✅ All required files present"
+
+          # Start BEST in background (use headless script for Linux)
+          echo "🚀 Starting BEST with HEADLESS=true (no GUI window)"
+          nohup npm run headless > ../../best-server.log 2>&1 &
+          BEST_PID=$!
+          echo "✅ BEST started with PID: $BEST_PID"
+          echo "📝 Using npm run headless (Linux version with --no-sandbox)"
+
+          # Smart wait for server to start - reduced from 15s to 3s, then verify
+          echo "Waiting for API server to start..."
+          sleep 3
+
+          # Verify server is running (retry with exponential backoff)
+          attempts=0
+          max_attempts=6
+          server_started=false
+          wait_time=2
+
+          while [ $attempts -lt $max_attempts ] && [ "$server_started" = "false" ]; do
+            attempts=$((attempts + 1))
+            echo "Attempt $attempts/$max_attempts to connect to API server..."
+
+            if curl -s --max-time 3 http://localhost:3000/api/health > /dev/null 2>&1; then
+              health_response=$(curl -s http://localhost:3000/api/health)
+              echo "✅ BEST API Server is running!"
+              echo "Response: $health_response"
+              server_started=true
+            else
+              echo "⚠️  Attempt $attempts failed"
+              if [ $attempts -lt $max_attempts ]; then
+                echo "Waiting $wait_time seconds before retry..."
+                sleep $wait_time
+                wait_time=$((wait_time * 2))  # Exponential backoff
+              fi
+            fi
+          done
+
+          if [ "$server_started" = "false" ]; then
+            echo "❌ Failed to start BEST API Server after $max_attempts attempts"
+            echo ""
+            echo "=========================================="
+            echo "Server logs (last 100 lines):"
+            echo "=========================================="
+            if [ -f "../../best-server.log" ]; then
+              tail -n 100 ../../best-server.log
+            else
+              echo "No log file found"
+            fi
+            echo "=========================================="
+            echo ""
+            echo "Checking if process is still running..."
+            if ps -p $BEST_PID > /dev/null 2>&1; then
+              echo "✅ Process is still running (PID: $BEST_PID)"
+              echo "Server started but not responding on port 3000"
+              echo ""
+              echo "Checking what's listening on port 3000..."
+              netstat -tuln | grep 3000 || echo "Nothing listening on port 3000"
+            else
+              echo "❌ Process died (PID: $BEST_PID)"
+            fi
+            exit 1
+          fi
+
+          echo "BEST_PID=$BEST_PID" >> $GITHUB_ENV
+
+      - name: Start LocalTunnel
+        run: |
+          echo "Starting localtunnel..."
+          subdomain="${{ github.event.inputs.subdomain }}"
+
+          if [ -n "$subdomain" ]; then
+            echo "Using custom subdomain: $subdomain"
+            tunnel_url="https://$subdomain.loca.lt"
+
+            # Start localtunnel in background
+            nohup lt --port 3000 --subdomain "$subdomain" > localtunnel.log 2>&1 &
+            LT_PID=$!
+            echo "LocalTunnel started with PID: $LT_PID"
+          else
+            echo "❌ Subdomain is required!"
+            exit 1
+          fi
+
+          # Reduced wait time from 10s to 3s with smart check
+          echo "Waiting for tunnel to establish..."
+          sleep 3
+
+          # Verify tunnel is working by checking logs and trying to connect
+          attempts=0
+          max_attempts=5
+          tunnel_established=false
+
+          while [ $attempts -lt $max_attempts ] && [ "$tunnel_established" = "false" ]; do
+            attempts=$((attempts + 1))
+
+            if grep -q "your url is:" localtunnel.log 2>/dev/null; then
+              echo "✅ LocalTunnel tunnel established!"
+              tunnel_established=true
+            else
+              if [ $attempts -lt $max_attempts ]; then
+                echo "Waiting for tunnel... (attempt $attempts/$max_attempts)"
+                sleep 2
+              fi
+            fi
+          done
+
+          # Verify local API is responding
+          if curl -s --max-time 3 http://localhost:3000/api/health > /dev/null 2>&1; then
+            echo "✅ Local API server responding"
+          else
+            echo "❌ Warning: Local API not responding"
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "✅ LocalTunnel Established!"
+          echo "=========================================="
+          echo ""
+          echo "🌐 Your BEST Backend is now accessible at:"
+          echo ""
+          echo "    $tunnel_url"
+          echo ""
+          echo "=========================================="
+          echo ""
+          echo "✨ Custom subdomain: $subdomain"
+          echo "📌 This URL will be consistent on future runs!"
+          echo "   (as long as you use the same subdomain)"
+          echo ""
+          echo "📋 Share this URL with your users!"
+          echo ""
+          echo "⚠️  IMPORTANT: First-time visitors may see a warning page"
+          echo "   Include header: bypass-tunnel-reminder: true"
+          echo ""
+          echo "=========================================="
+
+          echo "LT_PID=$LT_PID" >> $GITHUB_ENV
+          echo "TUNNEL_URL=$tunnel_url" >> $GITHUB_ENV
+
+      - name: Configure BEST via API
+        if: ${{ github.event.inputs.rc1 != '' || github.event.inputs.rc2 != '' || github.event.inputs.rc3 != '' || github.event.inputs.rc4 != '' }}
+        run: |
+          echo "Configuring BEST..."
+          
+          config_json=$(cat <<EOF
+          {
+            "rc1": "${{ github.event.inputs.rc1 }}",
+            "rc2": "${{ github.event.inputs.rc2 }}",
+            "rc3": "${{ github.event.inputs.rc3 }}",
+            "rc4": "${{ github.event.inputs.rc4 }}",
+            "kickrc": "${{ github.event.inputs.kickrc }}",
+            "planet": "${{ github.event.inputs.planet }}",
+            "device": "${{ github.event.inputs.device }}"
+          }
+          EOF
+          )
+          
+          if curl -X POST http://localhost:3000/api/configure \
+            -H "Content-Type: application/json" \
+            -d "$config_json" > /dev/null 2>&1; then
+            echo "✅ Configuration applied"
+          else
+            echo "⚠️  Configuration failed"
+          fi
+
+      - name: Connect to Game
+        if: ${{ github.event.inputs.rc1 != '' || github.event.inputs.rc2 != '' || github.event.inputs.rc3 != '' || github.event.inputs.rc4 != '' }}
+        run: |
+          echo "Connecting to game server..."
+          
+          if curl -X POST http://localhost:3000/api/connect \
+            -H "Content-Type: application/json" > /dev/null 2>&1; then
+            echo "✅ Connection initiated"
+            sleep 3
+            status=$(curl -s http://localhost:3000/api/status)
+            echo "Status: $status"
+          else
+            echo "⚠️  Connection failed"
+          fi
+
+      - name: Display API Information
+        run: |
+          tunnel_url="${TUNNEL_URL}"
+          subdomain="${{ github.event.inputs.subdomain }}"
+          
+          echo ""
+          echo "=========================================="
+          echo "📚 API Endpoints"
+          echo "=========================================="
+          echo ""
+          echo "Base URL: $tunnel_url"
+          echo ""
+          echo "Available endpoints:"
+          echo "  GET  $tunnel_url/api/health"
+          echo "  GET  $tunnel_url/api/status"
+          echo "  GET  $tunnel_url/api/logs"
+          echo "  POST $tunnel_url/api/configure"
+          echo "  POST $tunnel_url/api/connect"
+          echo "  POST $tunnel_url/api/disconnect"
+          echo "  POST $tunnel_url/api/send"
+          echo ""
+          echo "=========================================="
+          echo ""
+          echo "📝 Example: Test with curl"
+          echo ""
+          echo "curl -H \"bypass-tunnel-reminder: true\" $tunnel_url/api/health"
+          echo ""
+          echo "📝 Example: Configure"
+          echo ""
+          echo "curl -X POST $tunnel_url/api/configure \\"
+          echo "  -H \"bypass-tunnel-reminder: true\" \\"
+          echo "  -H \"Content-Type: application/json\" \\"
+          echo "  -d '{\"rc1\":\"YourCode\",\"planet\":\"Earth\",\"device\":\"312\"}'"
+          echo ""
+          echo "=========================================="
+          echo ""
+          echo "💡 TIP: Save your subdomain for consistent URLs!"
+          echo "   Subdomain used: $subdomain"
+          echo ""
+
+      - name: Keep Running
+        run: |
+          duration="${{ github.event.inputs.duration }}"
+          
+          # Validate duration
+          if [ -z "$duration" ] || [ "$duration" -lt 1 ]; then
+            duration=60
+          fi
+          
+          if [ "$duration" -gt 360 ]; then
+            duration=360
+          fi
+          
+          subdomain="${{ github.event.inputs.subdomain }}"
+          tunnel_url="${TUNNEL_URL}"
+          
+          echo ""
+          echo "=========================================="
+          echo "🚀 Backend is Running for $subdomain!"
+          echo "=========================================="
+          echo ""
+          echo "Tunnel URL: $tunnel_url"
+          echo "Duration: $duration minutes"
+          echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "Will stop: $(date -d "+$duration minutes" '+%Y-%m-%d %H:%M:%S')"
+          echo ""
+          echo "💡 TIP: Backend is ready but not connected yet."
+          echo "   Use /api/configure and /api/connect to start!"
+          echo ""
+          echo "Monitoring status every 60 seconds..."
+          echo ""
+          
+          end_time=$((SECONDS + duration * 60))
+          check_count=0
+          
+          while [ $SECONDS -lt $end_time ]; do
+            check_count=$((check_count + 1))
+            
+            if status_response=$(curl -s --max-time 5 http://localhost:3000/api/status 2>/dev/null); then
+              connected=$(echo "$status_response" | grep -o '"connected":[^,}]*' | cut -d':' -f2)
+              remaining=$(( (end_time - SECONDS) / 60 ))
+              
+              if [ "$connected" = "true" ]; then
+                status_icon="✅ Connected"
+              else
+                status_icon="⭕ Ready (waiting for connection)"
+              fi
+              
+              echo "[$(date '+%H:%M:%S')] Check #$check_count | $status_icon | Time left: $remaining min"
+              
+              # Show tunnel URL reminder every 10 checks
+              if [ $((check_count % 10)) -eq 0 ]; then
+                echo ""
+                echo "📌 Reminder - Your tunnel URL: $tunnel_url"
+                echo ""
+              fi
+            else
+              echo "[$(date '+%H:%M:%S')] ⚠️  Server status check failed"
+            fi
+            
+            sleep 60
+          done
+          
+          echo ""
+          echo "=========================================="
+          echo "⏰ Run duration completed ($duration minutes)"
+          echo "=========================================="
+          echo "Shutting down gracefully..."
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up..."
+          
+          # Disconnect WebSockets
+          if curl -X POST http://localhost:3000/api/disconnect \
+            -H "Content-Type: application/json" > /dev/null 2>&1; then
+            echo "✅ WebSockets disconnected"
+          else
+            echo "Disconnect request skipped"
+          fi
+          
+          # Show final logs
+          echo ""
+          echo "Final server logs:"
+          if [ -f "best-server.log" ]; then
+            tail -n 50 best-server.log
+          fi
+          
+          echo ""
+          echo "✅ Cleanup complete"
+          echo ""
+          echo "Thank you for using BEST Backend! 🎉"

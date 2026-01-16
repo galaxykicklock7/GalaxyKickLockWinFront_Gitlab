@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - best-network
+
+networks:
+  best-network:
+    driver: bridge

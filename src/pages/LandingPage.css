@@ -1,0 +1,495 @@
+/* Import Premium Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/* Animated gradient background - Black & Blue Theme */
+.landing-page {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: linear-gradient(-45deg, #0a0a0a, #0f172a, #1e293b, #000000);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Animated background particles - Blue Theme */
+.landing-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(96, 165, 250, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(37, 99, 235, 0.2) 0%, transparent 50%);
+  animation: particleFloat 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Glassmorphism grid overlay */
+.landing-page::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+
+/* Fixed Header */
+.landing-header-fixed {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 100;
+  width: 100%;
+  pointer-events: none;
+}
+
+.landing-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  font-family: 'Orbitron', 'Inter', sans-serif;
+  background: linear-gradient(135deg, #ffffff 0%, #93c5fd 50%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  text-shadow: 0 0 80px rgba(59, 130, 246, 0.5);
+  animation: titleGlow 3s ease-in-out infinite;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.landing-version {
+  font-size: 1.4rem;
+  font-family: 'Orbitron', 'Inter', sans-serif;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 10px 0 0 0;
+  font-weight: 800;
+  letter-spacing: 4px;
+  animation: versionPulse 2s ease-in-out infinite;
+}
+
+/* Content Area */
+.landing-content {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 140px 20px 100px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Premium glassmorphism card - Black & Blue Theme */
+.auth-container {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-radius: 24px;
+  padding: 32px 40px;
+  box-shadow:
+    0 12px 48px 0 rgba(59, 130, 246, 0.4),
+    inset 0 2px 0 0 rgba(59, 130, 246, 0.15),
+    0 0 0 1px rgba(59, 130, 246, 0.3);
+  border: 1.5px solid rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-content {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* Shimmer effect on card - Blue Theme */
+.auth-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg,
+      transparent 30%,
+      rgba(59, 130, 246, 0.12) 50%,
+      transparent 70%);
+  animation: shimmer 3s infinite;
+}
+
+/* Fixed Footer */
+.landing-footer-fixed {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  z-index: 100;
+  animation: fadeIn 1s ease-out 0.5s both;
+}
+
+.landing-footer-fixed p {
+  margin: 0;
+}
+
+/* Animations */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes particleFloat {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes titleGlow {
+
+  0%,
+  100% {
+    text-shadow: 0 0 80px rgba(59, 130, 246, 0.5);
+  }
+
+  50% {
+    text-shadow: 0 0 120px rgba(59, 130, 246, 0.8);
+  }
+}
+
+@keyframes versionPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Responsive design */
+
+/* Large Desktop (1920px+) - 4K, TV */
+@media (min-width: 1920px) {
+  .landing-header-fixed {
+    top: 60px;
+  }
+
+  .landing-title {
+    font-size: 3rem;
+  }
+
+  .landing-version {
+    font-size: 1.6rem;
+  }
+
+  .landing-content {
+    padding: 160px 20px 120px 20px;
+  }
+
+  .auth-container {
+    max-width: 480px;
+    padding: 56px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 40px;
+  }
+}
+
+/* Desktop (1024px - 1919px) - Standard laptop/desktop */
+@media (min-width: 1024px) and (max-width: 1919px) {
+  .landing-header-fixed {
+    top: 40px;
+  }
+
+  .landing-content {
+    padding: 140px 20px 100px 20px;
+  }
+
+  .auth-container {
+    max-width: 440px;
+  }
+}
+
+/* Tablet Landscape (768px - 1023px) - iPad Pro, tablets */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .landing-header-fixed {
+    top: 32px;
+  }
+
+  .landing-title {
+    font-size: 2.3rem;
+    letter-spacing: 0.3px;
+  }
+
+  .landing-version {
+    font-size: 1.3rem;
+    letter-spacing: 3px;
+  }
+
+  .landing-content {
+    padding: 120px 32px 90px 32px;
+  }
+
+  .auth-container {
+    max-width: 420px;
+    padding: 40px 32px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 26px;
+  }
+}
+
+/* Tablet Portrait (600px - 767px) - iPad, tablets */
+@media (min-width: 600px) and (max-width: 767px) {
+  .landing-header-fixed {
+    top: 28px;
+  }
+
+  .landing-title {
+    font-size: 2.1rem;
+    letter-spacing: 0.2px;
+  }
+
+  .landing-version {
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+  }
+
+  .landing-content {
+    padding: 110px 24px 85px 24px;
+  }
+
+  .auth-container {
+    max-width: 400px;
+    padding: 38px 30px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 24px;
+  }
+}
+
+/* Mobile Landscape (480px - 599px) - iPhone landscape */
+@media (min-width: 480px) and (max-width: 599px) {
+  .landing-header-fixed {
+    top: 24px;
+  }
+
+  .landing-title {
+    font-size: 1.9rem;
+    letter-spacing: 0.2px;
+  }
+
+  .landing-version {
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+  }
+
+  .landing-content {
+    padding: 105px 20px 80px 20px;
+  }
+
+  .auth-container {
+    max-width: 380px;
+    padding: 36px 28px;
+    border-radius: 20px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 22px;
+    font-size: 0.82rem;
+  }
+}
+
+/* Mobile Portrait (320px - 479px) - iPhone, Android phones */
+@media (max-width: 479px) {
+  .landing-header-fixed {
+    top: 20px;
+  }
+
+  .landing-title {
+    font-size: 1.7rem;
+    letter-spacing: 0.1px;
+  }
+
+  .landing-version {
+    font-size: 1rem;
+    letter-spacing: 2px;
+  }
+
+  .landing-content {
+    padding: 100px 16px 75px 16px;
+  }
+
+  .auth-container {
+    max-width: 100%;
+    padding: 32px 24px;
+    border-radius: 20px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 20px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Small Mobile (< 320px) - Very small devices */
+@media (max-width: 319px) {
+  .landing-header-fixed {
+    top: 16px;
+  }
+
+  .landing-title {
+    font-size: 1.5rem;
+    letter-spacing: 0px;
+  }
+
+  .landing-version {
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+  }
+
+  .landing-content {
+    padding: 95px 12px 70px 12px;
+  }
+
+  .auth-container {
+    padding: 28px 20px;
+    border-radius: 16px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 16px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-height: 600px) and (orientation: landscape) {
+  .landing-header-fixed {
+    top: 16px;
+  }
+
+  .landing-title {
+    font-size: 1.6rem;
+  }
+
+  .landing-version {
+    font-size: 1rem;
+    margin-top: 6px;
+  }
+
+  .landing-content {
+    padding: 85px 20px 65px 20px;
+  }
+
+  .auth-container {
+    padding: 28px 32px;
+  }
+
+  .landing-footer-fixed {
+    bottom: 16px;
+    font-size: 0.8rem;
+  }
+}
+
+/* High DPI displays (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+
+  .landing-title,
+  .landing-version {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
