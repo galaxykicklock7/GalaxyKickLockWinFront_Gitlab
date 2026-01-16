@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaAndroid, FaApple, FaGlobe, FaSignOutAlt, FaRocket, FaWifi, FaCloudUploadAlt, FaTimesCircle } from 'react-icons/fa';
-import { triggerWorkflow, pollWorkflowUntilRunning, cancelWorkflowRun, getLatestRunningWorkflowId } from '../../utils/github';
+import { triggerGitLabPipeline, pollGitLabPipelineUntilRunning, cancelGitLabPipeline, getLatestRunningGitLabPipeline } from '../../utils/gitlab';
 import { setBackendUrl, clearBackendUrl } from '../../utils/backendUrl';
 import { storageManager } from '../../utils/storageManager';
 import DeploymentModal from '../DeploymentModal';
@@ -35,13 +35,13 @@ const CommandBar = ({
     // Check if deployment is already done (persisted in storage)
     useEffect(() => {
         const savedDeploymentStatus = storageManager.getItem('deploymentStatus');
-        const savedRunId = storageManager.getItem('workflowRunId');
+        const savedPipelineId = storageManager.getItem('pipelineId');
         const savedLocalTest = storageManager.getItem('localTestMode') === 'true';
         
         if (savedDeploymentStatus === 'deployed') {
             setDeploymentStatus('deployed');
-            if (savedRunId) {
-                setCurrentRunId(parseInt(savedRunId));
+            if (savedPipelineId) {
+                setCurrentRunId(parseInt(savedPipelineId));
             }
         }
         
@@ -121,13 +121,13 @@ const CommandBar = ({
     };
 
     const handleDeploy = async () => {
-        // CRITICAL: Check if user already has a running workflow
+        // CRITICAL: Check if user already has a running pipeline
         try {
-            setDeploymentProgress({ percentage: 0, message: 'Checking for existing workflows...' });
-            const existingRunId = await getLatestRunningWorkflowId();
+            setDeploymentProgress({ percentage: 0, message: 'Checking for existing sessions...' });
+            const existingPipelineId = await getLatestRunningGitLabPipeline();
             
-            if (existingRunId) {
-                // User has a running workflow - show confirmation modal
+            if (existingPipelineId) {
+                // User has a running pipeline - show confirmation modal
                 setConfirmModalConfig({
                     title: '⚠️ SYSTEM ALREADY ACTIVE',
                     message: 'You already have an active session running.\n\nStarting a new session will stop the current one.\n\nContinue?',
@@ -135,22 +135,22 @@ const CommandBar = ({
                     type: 'warning',
                     onConfirm: () => {
                         setShowConfirmModal(false);
-                        performDeploy(existingRunId);
+                        performDeploy(existingPipelineId);
                     }
                 });
                 setShowConfirmModal(true);
                 return;
             }
         } catch (error) {
-            console.warn('Failed to check for existing workflows:', error);
+            console.warn('Failed to check for existing pipelines:', error);
             // Continue anyway - better to deploy than block user
         }
         
-        // No existing workflow - proceed directly
+        // No existing pipeline - proceed directly
         performDeploy(null);
     };
 
-    const performDeploy = async (oldRunId) => {
+    const performDeploy = async (oldPipelineId) => {
         setIsDeploying(true);
         setIsDeactivating(false);
         setDeploymentStatus('deploying');
@@ -158,14 +158,14 @@ const CommandBar = ({
         setDeploymentProgress({ percentage: 0, message: 'Initializing deployment sequence...' });
 
         try {
-            // If there's an old workflow, cancel it first
-            if (oldRunId) {
+            // If there's an old pipeline, cancel it first
+            if (oldPipelineId) {
                 setDeploymentProgress({ percentage: 5, message: 'Stopping previous session...' });
-                await cancelWorkflowRun(oldRunId);
+                await cancelGitLabPipeline(oldPipelineId);
                 await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for cancellation
             }
 
-            // Step 1: Trigger workflow (10%)
+            // Step 1: Trigger pipeline (10%)
             setDeploymentProgress({ percentage: 10, message: 'Initializing system...' });
             
             // Get current user's username
@@ -173,7 +173,7 @@ const CommandBar = ({
                 throw new Error('User information not available. Please refresh and try again.');
             }
 
-            const triggerResult = await triggerWorkflow(currentUser.username);
+            const triggerResult = await triggerGitLabPipeline(currentUser.username);
 
             if (!triggerResult.success) {
                 throw new Error(triggerResult.error || 'Failed to trigger deployment');
@@ -187,18 +187,18 @@ const CommandBar = ({
             setBackendUrl(backendUrl);
             storageManager.setItem('backendSubdomain', subdomain);
             storageManager.setItem('deploymentStatus', 'deployed');
-            storageManager.setItem('workflowRunId', triggerResult.run_id.toString());
+            storageManager.setItem('pipelineId', triggerResult.pipeline_id.toString());
 
-            // Step 2: Workflow triggered (20%)
+            // Step 2: Pipeline triggered (20%)
             setDeploymentProgress({ percentage: 20, message: 'System initialized...' });
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Step 3: Waiting for workflow to start (30%)
+            // Step 3: Waiting for pipeline to start (30%)
             setDeploymentProgress({ percentage: 30, message: 'Establishing connection...' });
 
-            // Step 4: Poll until workflow reaches "Keep running" stage (30% - 90%)
-            const pollResult = await pollWorkflowUntilRunning(
-                triggerResult.run_id,
+            // Step 4: Poll until pipeline reaches "Keep running" stage (30% - 90%)
+            const pollResult = await pollGitLabPipelineUntilRunning(
+                triggerResult.pipeline_id,
                 (progress) => {
                     // Calculate percentage based on attempts (30% to 90%)
                     const progressPercent = 30 + Math.min(60, (progress.attempt / progress.maxAttempts) * 60);
@@ -223,16 +223,16 @@ const CommandBar = ({
                 message: 'Galaxy Kick Lock 2.0 activated!' 
             });
             setDeploymentStatus('deployed');
-            setCurrentRunId(triggerResult.run_id);
+            setCurrentRunId(triggerResult.pipeline_id);
             
             // Trigger custom event to notify components that deployment is complete
             window.dispatchEvent(new CustomEvent('deploymentStatusChanged', { 
                 detail: { status: 'deployed', backendUrl } 
             }));
             
-            // Start workflow monitoring to detect if backend stops
-            if (onDeploymentSuccess && triggerResult.run_id) {
-                onDeploymentSuccess(triggerResult.run_id);
+            // Start pipeline monitoring to detect if backend stops
+            if (onDeploymentSuccess && triggerResult.pipeline_id) {
+                onDeploymentSuccess(triggerResult.pipeline_id);
             }
             
             // Keep modal open for user to see success
@@ -241,11 +241,11 @@ const CommandBar = ({
             setDeploymentStatus('failed');
             setDeploymentProgress({ 
                 percentage: 0, 
-                message: error.message || 'Deployment failed. Please try again.'
+                message: error.message || error.toString() || 'Deployment failed. Please try again.'
             });
             clearBackendUrl();
             storageManager.removeItem('deploymentStatus');
-            storageManager.removeItem('workflowRunId');
+            storageManager.removeItem('pipelineId');
         } finally {
             setIsDeploying(false);
         }
@@ -287,22 +287,22 @@ const CommandBar = ({
         setDeploymentProgress({ percentage: 0, message: 'Deactivating system...' });
 
         try {
-            // Try to cancel the current workflow run
-            let runIdToCancel = currentRunId;
+            // Try to cancel the current pipeline
+            let pipelineIdToCancel = currentRunId;
             
-            // If we don't have a stored run ID, try to get the latest running one
-            if (!runIdToCancel) {
-                setDeploymentProgress({ percentage: 20, message: 'Finding active workflow...' });
-                runIdToCancel = await getLatestRunningWorkflowId();
+            // If we don't have a stored pipeline ID, try to get the latest running one
+            if (!pipelineIdToCancel) {
+                setDeploymentProgress({ percentage: 20, message: 'Finding active pipeline...' });
+                pipelineIdToCancel = await getLatestRunningGitLabPipeline();
             }
 
-            if (runIdToCancel) {
+            if (pipelineIdToCancel) {
                 setDeploymentProgress({ percentage: 40, message: 'Stopping system...' });
-                const cancelResult = await cancelWorkflowRun(runIdToCancel);
+                const cancelResult = await cancelGitLabPipeline(pipelineIdToCancel);
                 
                 if (!cancelResult.success) {
-                    console.warn('Failed to cancel workflow:', cancelResult.error);
-                    // Continue anyway - workflow might have already completed
+                    console.warn('Failed to cancel pipeline:', cancelResult.error);
+                    // Continue anyway - pipeline might have already completed
                 }
                 
                 setDeploymentProgress({ percentage: 80, message: 'System stopped...' });
@@ -322,7 +322,7 @@ const CommandBar = ({
                 setLocalTestMode(false);
                 clearBackendUrl();
                 storageManager.removeItem('deploymentStatus');
-                storageManager.removeItem('workflowRunId');
+                storageManager.removeItem('pipelineId');
                 storageManager.removeItem('localTestMode');
                 
                 // Trigger custom event to notify components
