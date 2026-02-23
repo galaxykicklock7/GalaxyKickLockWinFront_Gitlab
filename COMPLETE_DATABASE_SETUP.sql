@@ -13,6 +13,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Drop existing objects (in correct order)
+DROP TABLE IF EXISTS public.imprisonment_metrics CASCADE;
 DROP TABLE IF EXISTS public.user_sessions CASCADE;
 DROP TABLE IF EXISTS public.users CASCADE;
 DROP TABLE IF EXISTS public.tokens CASCADE;
@@ -93,6 +94,18 @@ CREATE TABLE public.user_sessions (
   ip_address TEXT
 );
 
+-- Imprisonment metrics table for ML training data
+CREATE TABLE public.imprisonment_metrics (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  connection_number INTEGER NOT NULL CHECK (connection_number BETWEEN 1 AND 5),
+  timestamp_ms INTEGER NOT NULL,
+  player_name VARCHAR(255) NOT NULL,
+  code_used VARCHAR(10) NOT NULL CHECK (code_used IN ('primary', 'alt')),
+  is_clan_member BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =====================================================
 -- INDEXES
 -- =====================================================
@@ -107,6 +120,8 @@ CREATE INDEX idx_user_sessions_user_id ON public.user_sessions(user_id);
 CREATE INDEX idx_user_sessions_token ON public.user_sessions(session_token);
 CREATE INDEX idx_user_sessions_active ON public.user_sessions(is_active);
 CREATE INDEX idx_user_sessions_created_at ON public.user_sessions(created_at);
+CREATE INDEX idx_imprisonment_user_conn ON public.imprisonment_metrics(user_id, connection_number);
+CREATE INDEX idx_imprisonment_created_at ON public.imprisonment_metrics(created_at);
 
 -- =====================================================
 -- TRIGGER FUNCTIONS
@@ -714,6 +729,8 @@ GRANT EXECUTE ON FUNCTION public.get_tokens_by_duration(INTEGER) TO anon, authen
 GRANT EXECUTE ON FUNCTION public.renew_user_token(UUID, INTEGER) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_user(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_token(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_imprisonment_metric(UUID, INTEGER, INTEGER, TEXT, TEXT, BOOLEAN) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_imprisonment_metrics(UUID, INTEGER) TO anon, authenticated;
 
 -- =====================================================
 -- COMPLETE - ALL FEATURES INCLUDED
@@ -725,7 +742,101 @@ GRANT EXECUTE ON FUNCTION public.delete_token(UUID) TO anon, authenticated;
 -- ✅ SINGLE SESSION ENFORCEMENT (latest login wins)
 -- ✅ TOKEN DELETION DETECTION (admin revocation)
 -- ✅ User and token management functions
+-- ✅ Imprisonment metrics for ML training
 -- ✅ Security best practices (password hashing, constraints)
 -- ✅ Indexes for performance
 -- ✅ Proper foreign keys and cascades
 -- =====================================================
+
+
+-- =====================================================
+-- IMPRISONMENT METRICS FUNCTIONS
+-- =====================================================
+
+-- Record imprisonment metric
+CREATE OR REPLACE FUNCTION public.record_imprisonment_metric(
+  p_user_id UUID,
+  p_connection_number INTEGER,
+  p_timestamp_ms INTEGER,
+  p_player_name TEXT,
+  p_code_used TEXT,
+  p_is_clan_member BOOLEAN
+)
+RETURNS JSON AS $$
+BEGIN
+  -- Validation
+  IF p_connection_number < 1 OR p_connection_number > 5 THEN
+    RETURN json_build_object('success', false, 'error', 'Invalid connection number');
+  END IF;
+  
+  IF p_code_used NOT IN ('primary', 'alt') THEN
+    RETURN json_build_object('success', false, 'error', 'Invalid code type');
+  END IF;
+  
+  -- Insert metric
+  INSERT INTO public.imprisonment_metrics (
+    user_id, 
+    connection_number, 
+    timestamp_ms, 
+    player_name, 
+    code_used, 
+    is_clan_member
+  )
+  VALUES (
+    p_user_id, 
+    p_connection_number, 
+    p_timestamp_ms, 
+    p_player_name, 
+    p_code_used, 
+    p_is_clan_member
+  );
+  
+  RETURN json_build_object('success', true);
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN json_build_object('success', false, 'error', 'Failed to record metric');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Get imprisonment metrics for a connection
+CREATE OR REPLACE FUNCTION public.get_imprisonment_metrics(
+  p_user_id UUID,
+  p_connection_number INTEGER
+)
+RETURNS JSON AS $$
+DECLARE
+  v_metrics JSON;
+BEGIN
+  -- Validation
+  IF p_connection_number < 1 OR p_connection_number > 5 THEN
+    RETURN json_build_object('success', false, 'error', 'Invalid connection number');
+  END IF;
+  
+  -- Get metrics
+  SELECT json_agg(metric_data ORDER BY created_at DESC)
+  INTO v_metrics
+  FROM (
+    SELECT json_build_object(
+      'timestamp', timestamp_ms,
+      'playerName', player_name,
+      'code', code_used,
+      'isClan', is_clan_member
+    ) as metric_data
+    FROM public.imprisonment_metrics
+    WHERE user_id = p_user_id 
+      AND connection_number = p_connection_number
+    ORDER BY created_at DESC
+    LIMIT 1000
+  ) subquery;
+  
+  RETURN json_build_object(
+    'success', true, 
+    'data', COALESCE(v_metrics, '[]'::json)
+  );
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN json_build_object('success', false, 'error', 'Failed to fetch metrics');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -2,7 +2,7 @@ import React from 'react';
 import { FaMicrochip, FaShieldAlt, FaSkull, FaRobot, FaSlidersH, FaPowerOff, FaMoon } from 'react-icons/fa';
 import './PremiumLayout.css';
 
-const CoreSystems = ({ config, onConfigChange }) => {
+const CoreSystems = ({ config, onConfigChange, onAiCoreToggle, aiCoreEnabled, aiCoreLoading, connected }) => {
     return (
         <div className="hud-panel core-systems">
             <div className="panel-header">
@@ -42,7 +42,7 @@ const CoreSystems = ({ config, onConfigChange }) => {
                 {/* DEFENSE MATRIX - Left */}
                 <div className="control-section">
                     <span className="section-label">DEFENSE MATRIX</span>
-                    <div className="matrix-grid-three">
+                    <div className="matrix-grid-two">
                         <div
                             className={`cyber-toggle ${config.autorelease ? 'active' : ''}`}
                             onClick={() => onConfigChange('autorelease', !config.autorelease)}
@@ -54,12 +54,6 @@ const CoreSystems = ({ config, onConfigChange }) => {
                             onClick={() => onConfigChange('smart', !config.smart)}
                         >
                             SMART MODE
-                        </div>
-                        <div
-                            className={`cyber-toggle ${config.lowsecmode ? 'active' : ''}`}
-                            onClick={() => onConfigChange('lowsecmode', !config.lowsecmode)}
-                        >
-                            LOW-SEC
                         </div>
                     </div>
                 </div>
@@ -156,18 +150,70 @@ const CoreSystems = ({ config, onConfigChange }) => {
                     </div>
                 </div>
 
-                {/* AI CORE - Left Bottom */}
-                <div
-                    className="ai-core-container"
-                    style={{ cursor: 'default' }}
-                >
-                    <div className="ai-pulse"></div>
-                    <div className="ai-label">
-                        <FaRobot style={{ fontSize: '14px' }} />
-                        <span>AI CORE</span>
-                        <span style={{ fontSize: '7px', color: '#ff9d00', marginLeft: '5px', fontWeight: 600 }}>
-                            COMING SOON
-                        </span>
+                {/* AI CORE + SPEED PRESET - Left Bottom */}
+                <div className="ai-core-wrapper">
+                    <div
+                        className={`ai-core-container ${aiCoreEnabled ? 'active' : ''} ${aiCoreLoading ? 'loading' : ''}`}
+                        onClick={() => connected && !aiCoreLoading && onAiCoreToggle && onAiCoreToggle()}
+                        style={{
+                            cursor: connected && !aiCoreLoading ? 'pointer' : 'not-allowed',
+                            opacity: connected ? 1 : 0.5,
+                            pointerEvents: aiCoreLoading ? 'none' : 'auto'
+                        }}
+                        title={
+                            aiCoreLoading ? 'Processing...' :
+                            connected ? (aiCoreEnabled ? 'AI CORE ACTIVE - Click to disable' : 'Click to activate AI CORE for all connections') :
+                            'Connect first to enable AI CORE'
+                        }
+                    >
+                        <div className="ai-pulse"></div>
+                        <div className="ai-label">
+                            <FaRobot style={{ fontSize: '14px' }} />
+                            <span>{aiCoreLoading ? 'PROCESSING...' : 'AI CORE'}</span>
+                            {aiCoreEnabled && !aiCoreLoading && (
+                                <span style={{ fontSize: '7px', color: '#00ff88', marginLeft: '5px', fontWeight: 600 }}>
+                                    ACTIVE
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="speed-preset-row">
+                        <div
+                            className={`speed-btn ${config.speedPreset === 'SLOW' ? 'active slow' : ''} ${!aiCoreEnabled ? 'disabled' : ''}`}
+                            onClick={() => aiCoreEnabled && onConfigChange('speedPreset', config.speedPreset === 'SLOW' ? '' : 'SLOW')}
+                            style={{
+                                cursor: aiCoreEnabled ? 'pointer' : 'not-allowed',
+                                opacity: aiCoreEnabled ? 1 : 0.5,
+                                pointerEvents: aiCoreEnabled ? 'auto' : 'none'
+                            }}
+                            title={aiCoreEnabled ? "1775 - 1875" : "Enable AI CORE to use speed presets"}
+                        >
+                            SLOW
+                        </div>
+                        <div
+                            className={`speed-btn ${config.speedPreset === 'NORMAL' ? 'active normal' : ''} ${!aiCoreEnabled ? 'disabled' : ''}`}
+                            onClick={() => aiCoreEnabled && onConfigChange('speedPreset', config.speedPreset === 'NORMAL' ? '' : 'NORMAL')}
+                            style={{
+                                cursor: aiCoreEnabled ? 'pointer' : 'not-allowed',
+                                opacity: aiCoreEnabled ? 1 : 0.5,
+                                pointerEvents: aiCoreEnabled ? 'auto' : 'none'
+                            }}
+                            title={aiCoreEnabled ? "1875 - 1975" : "Enable AI CORE to use speed presets"}
+                        >
+                            NORMAL
+                        </div>
+                        <div
+                            className={`speed-btn ${config.speedPreset === 'FAST' ? 'active fast' : ''} ${!aiCoreEnabled ? 'disabled' : ''}`}
+                            onClick={() => aiCoreEnabled && onConfigChange('speedPreset', config.speedPreset === 'FAST' ? '' : 'FAST')}
+                            style={{
+                                cursor: aiCoreEnabled ? 'pointer' : 'not-allowed',
+                                opacity: aiCoreEnabled ? 1 : 0.5,
+                                pointerEvents: aiCoreEnabled ? 'auto' : 'none'
+                            }}
+                            title={aiCoreEnabled ? "1975 - 2150" : "Enable AI CORE to use speed presets"}
+                        >
+                            FAST
+                        </div>
                     </div>
                 </div>
 
@@ -178,34 +224,87 @@ const CoreSystems = ({ config, onConfigChange }) => {
                         <div className="tuning-row">
                             <span style={{ fontSize: '11px', color: '#fff', fontWeight: 600 }}>INC/DEC</span>
                             <div style={{ display: 'flex', gap: '3px' }}>
-                                <input type="number" className="tiny-input" value={config.incrementvalue || ''} onChange={(e) => onConfigChange('incrementvalue', parseInt(e.target.value) || 0)} placeholder="Inc" />
-                                <input type="number" className="tiny-input" value={config.decrementvalue || ''} onChange={(e) => onConfigChange('decrementvalue', parseInt(e.target.value) || 0)} placeholder="Dec" />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.incrementvalue || ''} 
+                                    onChange={(e) => onConfigChange('incrementvalue', parseInt(e.target.value) || 0)} 
+                                    placeholder="Inc"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Increment value"}
+                                />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.decrementvalue || ''} 
+                                    onChange={(e) => onConfigChange('decrementvalue', parseInt(e.target.value) || 0)} 
+                                    placeholder="Dec"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Decrement value"}
+                                />
                             </div>
                         </div>
 
                         <div className="tuning-row">
                             <span style={{ fontSize: '11px', color: '#fff', fontWeight: 600 }}>DEF</span>
                             <div style={{ display: 'flex', gap: '3px' }}>
-                                <input type="number" className="tiny-input" value={config.mindef || ''} onChange={(e) => onConfigChange('mindef', parseInt(e.target.value) || 0)} placeholder="Min" />
-                                <input type="number" className="tiny-input" value={config.maxdef || ''} onChange={(e) => onConfigChange('maxdef', parseInt(e.target.value) || 0)} placeholder="Max" />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.mindef || ''} 
+                                    onChange={(e) => onConfigChange('mindef', parseInt(e.target.value) || 0)} 
+                                    placeholder="Min"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Min defense"}
+                                />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.maxdef || ''} 
+                                    onChange={(e) => onConfigChange('maxdef', parseInt(e.target.value) || 0)} 
+                                    placeholder="Max"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Max defense"}
+                                />
                             </div>
                         </div>
 
                         <div className="tuning-row">
                             <span style={{ fontSize: '11px', color: '#fff', fontWeight: 600 }}>ATK</span>
                             <div style={{ display: 'flex', gap: '3px' }}>
-                                <input type="number" className="tiny-input" value={config.minatk || ''} onChange={(e) => onConfigChange('minatk', parseInt(e.target.value) || 0)} placeholder="Min" />
-                                <input type="number" className="tiny-input" value={config.maxatk || ''} onChange={(e) => onConfigChange('maxatk', parseInt(e.target.value) || 0)} placeholder="Max" />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.minatk || ''} 
+                                    onChange={(e) => onConfigChange('minatk', parseInt(e.target.value) || 0)} 
+                                    placeholder="Min"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Min attack"}
+                                />
+                                <input 
+                                    type="number" 
+                                    className="tiny-input" 
+                                    value={config.maxatk || ''} 
+                                    onChange={(e) => onConfigChange('maxatk', parseInt(e.target.value) || 0)} 
+                                    placeholder="Max"
+                                    disabled={aiCoreEnabled}
+                                    title={aiCoreEnabled ? "Disabled - AI Core active" : "Max attack"}
+                                />
                             </div>
                         </div>
 
                         <div className="tuning-row" style={{ marginTop: '2px' }}>
                             <div
-                                className={`cyber-toggle ${config.timershift ? 'active' : ''}`}
-                                onClick={() => onConfigChange('timershift', !config.timershift)}
-                                style={{ width: '100%' }}
+                                className={`cyber-toggle ${config.timershift ? 'active' : ''} ${aiCoreEnabled ? 'disabled' : ''}`}
+                                onClick={() => !aiCoreEnabled && onConfigChange('timershift', !config.timershift)}
+                                style={{ 
+                                    width: '100%',
+                                    cursor: aiCoreEnabled ? 'not-allowed' : 'pointer',
+                                    opacity: aiCoreEnabled ? 0.5 : 1
+                                }}
+                                title={aiCoreEnabled ? "Disabled - AI Core controls timing" : "Toggle Auto Interval"}
                             >
-                                AUTO INT
+                                AUTO INT {aiCoreEnabled && '(AI)'}
                             </div>
                         </div>
                     </div>

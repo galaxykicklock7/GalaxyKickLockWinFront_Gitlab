@@ -5,6 +5,7 @@ import { useWorkflowMonitor } from './hooks/useWorkflowMonitor';
 import { isAuthenticated, logoutUser, getSession } from './utils/auth';
 import { isAdminAuthenticated } from './utils/adminAuth';
 import { storageManager } from './utils/storageManager';
+import { tunnelStorage } from './utils/tunnelStorage';
 import LandingPage from './pages/LandingPage';
 import AdminLandingPage from './pages/AdminLandingPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -61,6 +62,9 @@ function UserApp() {
   
   // Use ref to track if we've already logged out to prevent spam
   const hasLoggedOutRef = useRef(false);
+  
+  // Debounce timer for backend config updates
+  const configUpdateTimerRef = useRef(null);
 
   // Load config from storage or use defaults
   const getInitialConfig = () => {
@@ -120,12 +124,24 @@ function UserApp() {
       dadplus: false,
       kickall: false,
       reconnect: 5000,
+      // Metrics tracking (enabled by default)
+      metricsEnabled: true,
       // AI Mode (backend handles all AI settings with defaults)
-      aiMode: false
+      aiMode: false,
+      // Speed preset: 'SLOW', 'NORMAL', 'FAST', or '' for custom
+      speedPreset: ''
     };
   };
 
   const [config, setConfig] = useState(getInitialConfig());
+  
+  // AI CORE state
+  const [aiCoreEnabled, setAiCoreEnabled] = useState(() => {
+    // Restore from localStorage on mount
+    const saved = storageManager.getItem('aiCoreEnabled');
+    return saved === 'true';
+  });
+  const [aiCoreLoading, setAiCoreLoading] = useState(false);
 
   const {
     status,
@@ -143,7 +159,7 @@ function UserApp() {
     setToast({ message, type });
   };
 
-  // Monitor GitHub workflow status - auto-reset if backend stops
+  // Monitor deployment system status - auto-reset if backend stops
   const { isMonitoring, startMonitoring, stopMonitoring } = useWorkflowMonitor(showToast);
 
   // Check authentication on mount
@@ -167,6 +183,10 @@ function UserApp() {
 
     checkAuth();
 
+    // ✅ NEW: Initialize tunnel manager on app startup
+    console.log('🌐 Initializing tunnel manager on app startup...');
+    tunnelStorage.initializeTunnelManager();
+
     // Generate unique tab ID for this tab (only once on mount)
     const tabId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     sessionStorage.setItem('tabId', tabId);
@@ -184,13 +204,13 @@ function UserApp() {
       // Save current config immediately using storage manager
       storageManager.setItem('galaxyKickLockConfig', config);
       
-      // DO NOT show warning or cancel workflow on refresh
+      // DO NOT show warning or cancel deployment on refresh
       // User can manually deactivate if they want to stop the backend
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // DO NOT cancel workflow on page unload - let it keep running
+    // DO NOT cancel deployment on page unload - let it keep running
     // User must manually click DEACTIVATE to stop the backend
 
     // Listen for storage changes
@@ -278,7 +298,7 @@ function UserApp() {
           
           // Clear local state
           storageManager.removeItem('deploymentStatus');
-          storageManager.removeItem('workflowRunId');
+          storageManager.removeItem('pipelineId');
           storageManager.removeItem('backendSubdomain');
           storageManager.removeItem('localTestMode');
 
@@ -377,7 +397,7 @@ function UserApp() {
     setShowLogoutConfirm(false);
     showToast('Logging out...', 'info');
 
-    // DO NOT cancel workflow on logout - let backend keep running
+    // DO NOT cancel deployment on logout - let backend keep running
     try {
       // 1. Disconnect if connected
       if (connected) {
@@ -388,9 +408,9 @@ function UserApp() {
         }
       }
 
-      // 2. Just clear local state - DO NOT cancel workflow
+      // 2. Just clear local state - DO NOT cancel deployment
       storageManager.removeItem('deploymentStatus');
-      storageManager.removeItem('workflowRunId');
+      storageManager.removeItem('pipelineId');
       storageManager.removeItem('backendSubdomain');
       storageManager.removeItem('localTestMode');
 
@@ -398,7 +418,7 @@ function UserApp() {
       const { clearBackendUrl } = await import('./utils/backendUrl');
       clearBackendUrl();
 
-      // Stop workflow monitoring
+      // Stop deployment monitoring
       stopMonitoring();
 
       // Emit event to reset UI
@@ -461,9 +481,17 @@ function UserApp() {
         }
       }
 
-      // Save and send immediately using storage manager
+      // Save to storage immediately (for persistence)
       storageManager.setItem('galaxyKickLockConfig', newConfig);
-      updateConfig(newConfig);
+      
+      // Debounce backend API call to prevent spam
+      if (configUpdateTimerRef.current) {
+        clearTimeout(configUpdateTimerRef.current);
+      }
+      
+      configUpdateTimerRef.current = setTimeout(() => {
+        updateConfig(newConfig);
+      }, 300); // 300ms debounce for backend updates
 
       return newConfig;
     });
@@ -539,11 +567,47 @@ function UserApp() {
 
       // Update configuration first
       console.log('📤 Sending config to backend before connect...');
-      await updateConfig(config);
-      console.log('✅ Config sent, now connecting...');
+      
+      // Add userId to config for metrics tracking
+      const configWithUserId = {
+        ...config,
+        userId: currentUser?.user_id || null
+      };
+      
+      await updateConfig(configWithUserId);
+      console.log('✅ Config sent (with userId), now connecting...');
       // Then connect
       await connect();
       showToast('Connected successfully!', 'success');
+
+      // If AI Core was restored from localStorage, re-send enable commands to backend
+      if (aiCoreEnabled) {
+        try {
+          const { getBackendUrl } = await import('./utils/backendUrl');
+          const backendUrl = getBackendUrl();
+          if (backendUrl) {
+            const aiPromises = [];
+            for (let i = 1; i <= 5; i++) {
+              const hasRC = config[`rc${i}`] && config[`rc${i}`].trim() !== '';
+              const hasRCL = config[`rcl${i}`] && config[`rcl${i}`].trim() !== '';
+              if (hasRC || hasRCL) {
+                aiPromises.push(
+                  fetch(`${backendUrl}/api/ai/enable/${i}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' }
+                  })
+                );
+              }
+            }
+            if (aiPromises.length > 0) {
+              await Promise.all(aiPromises);
+              showToast(`🧠 AI CORE re-enabled for ${aiPromises.length} connection(s)`, 'success');
+            }
+          }
+        } catch (aiErr) {
+          console.error('Failed to re-enable AI Core after connect:', aiErr);
+        }
+      }
     } catch (err) {
 
       // Provide more specific error messages
@@ -564,6 +628,12 @@ function UserApp() {
   const handleDisconnect = async () => {
     try {
       await disconnect();
+      
+      // Disable AI Core when disconnecting and clear from storage
+      if (aiCoreEnabled) {
+        setAiCoreEnabled(false);
+        storageManager.setItem('aiCoreEnabled', 'false');
+      }
     } catch (err) {
 
       // Try to extract error message from backend response
@@ -580,6 +650,97 @@ function UserApp() {
       }
 
       showToast(errorMessage, 'error');
+    }
+  };
+  
+  // AI CORE toggle handler - enables/disables AI for ALL connections
+  const handleAiCoreToggle = async () => {
+    if (aiCoreLoading) return;
+    
+    setAiCoreLoading(true);
+    const newState = !aiCoreEnabled;
+    
+    // Immediate visual feedback - optimistic update
+    setAiCoreEnabled(newState);
+    
+    try {
+      const { getBackendUrl } = await import('./utils/backendUrl');
+      const backendUrl = getBackendUrl();
+      
+      if (!backendUrl) {
+        showToast('Backend not connected', 'error');
+        setAiCoreEnabled(!newState); // Revert on error
+        setAiCoreLoading(false);
+        return;
+      }
+      
+      const action = newState ? 'enable' : 'disable';
+      
+      // Only enable/disable AI for ACTIVE connections (those with recovery codes)
+      const promises = [];
+      const activeConnections = [];
+      
+      for (let i = 1; i <= 5; i++) {
+        // Check if this connection has a recovery code configured
+        const hasRC = config[`rc${i}`] && config[`rc${i}`].trim() !== '';
+        const hasRCL = config[`rcl${i}`] && config[`rcl${i}`].trim() !== '';
+        
+        if (hasRC || hasRCL) {
+          activeConnections.push(i);
+          promises.push(
+            fetch(`${backendUrl}/api/ai/${action}/${i}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'bypass-tunnel-reminder': 'true'
+              }
+            }).then(r => ({ connection: i, ok: r.ok, response: r }))
+          );
+        }
+      }
+      
+      if (activeConnections.length === 0) {
+        showToast('No active connections to enable AI for', 'error');
+        setAiCoreEnabled(!newState); // Revert
+        setAiCoreLoading(false);
+        return;
+      }
+      
+      const results = await Promise.all(promises);
+      
+      // Check results
+      const succeeded = results.filter(r => r.ok);
+      const failed = results.filter(r => !r.ok);
+      
+      if (succeeded.length > 0) {
+        // Save to localStorage for persistence
+        storageManager.setItem('aiCoreEnabled', newState.toString());
+        
+        if (failed.length === 0) {
+          showToast(
+            newState ? `🧠 AI CORE ACTIVATED - Beast mode enabled for ${succeeded.length} connection(s)!` : 'AI CORE deactivated',
+            newState ? 'success' : 'info'
+          );
+        } else {
+          showToast(
+            `AI ${newState ? 'enabled' : 'disabled'} for ${succeeded.length}/${activeConnections.length} connections`,
+            'warning'
+          );
+        }
+      } else {
+        // All failed - revert state
+        setAiCoreEnabled(!newState);
+        storageManager.setItem('aiCoreEnabled', (!newState).toString());
+        showToast('All connections failed to enable AI. Make sure connections are active.', 'error');
+      }
+      
+    } catch (error) {
+      console.error('AI Core toggle error:', error);
+      setAiCoreEnabled(!newState); // Revert on error
+      storageManager.setItem('aiCoreEnabled', (!newState).toString());
+      showToast(`AI Core ${newState ? 'enable' : 'disable'} failed: ${error.message}`, 'error');
+    } finally {
+      setAiCoreLoading(false);
     }
   };
 
@@ -655,12 +816,17 @@ function UserApp() {
           onConfigChange={handleConfigChange}
           status={status}
           connected={connected}
+          aiCoreEnabled={aiCoreEnabled}
         />
 
         {/* Middle: Core Systems */}
         <CoreSystems
           config={config}
           onConfigChange={handleConfigChange}
+          onAiCoreToggle={handleAiCoreToggle}
+          aiCoreEnabled={aiCoreEnabled}
+          aiCoreLoading={aiCoreLoading}
+          connected={connected}
         />
 
         {/* Right: Security Database */}

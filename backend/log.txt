@@ -1,0 +1,211 @@
+
+[WS1] Parsed command: :del
+[WS1] RAW MESSAGE: :``THALA`` PRISON 0 :Prison for 104d 13h 22min    
+
+[WS1] Parsed command: :``THALA``
+[WS1] ≡ƒö┤ PRISON keyword detected - sending JOIN to trigger detectio
+n messages
+[WS1] Sent JOIN command to get 353/332 messages
+[WS1] RAW MESSAGE: 852 36 :Shake hand
+852 44 :Friendly hug
+852 12 :Smooch
+852 18 :Kick butt
+852 144 :Invite for tea
+852 145 :Make tattoo
+852 140 :Offend
+852 5 :Fight
+852 141 :Cow
+852 143 :Humble
+852 57 :Tell t
+[WS1] Parsed command: 852
+[WS1] RAW MESSAGE: 853
+
+[WS1] Parsed command: 853
+
+[WS1] RAW MESSAGE: 353 1 = Prison*5 :TEAM_SPARROW `[R]OLE[X]` 5453177
+3 -2 hb/417_ 0 -70 33 0 9039_ 0 0 33 0 158 - }Darkdevil{ 63369668 -2 
+hb/502_ 0 -32 33 0 9040_ 0 0 33 0 118
+
+[WS1] Parsed command: 353
+[WS1] 353 message received - Planet: Prison*5
+[WS1] New planet - waiting for FOUNDER message
+[WS1] Founder ID: NONE
+[LOG1] ≡ƒôï 353 - Users on Prison*5
+[WS1] ≡ƒö┤ PRISON CONFIRMED via 353 - Planet: Prison*5
+[LOG1] ≡ƒö┤ In Prison: Prison*5
+[LOG1] ≡ƒöô Prison detected on connect - attempting escape
+[WS1] Triggering auto-release...
+[WS1] 353 - Config check: {
+  modena: false,
+  kickmode: false,
+  kickall: false,
+  kickbybl: true,
+  dadplus: false
+}
+[WS1] 353 - kickModeEnabled: true
+[WS1] 353 - Routing to Kick/Imprison mode
+[LOG1] Skipping prison channel
+[WS1] RAW MESSAGE: 366 :end of names
+
+[WS1] Parsed command: 366
+[WS1] RAW MESSAGE: 860 54531773 13908 1;aura/0_5;0;0;33 63369668 1012
+5 1;aura/0_5;0;0;33
+
+[WS1] Parsed command: 860
+[WS1] RAW MESSAGE: 866 ceba99 ceba99 25 94956d 3f401c 32 24241e 24241
+e 0D
+
+[WS1] Parsed command: 866
+[WS1] RAW MESSAGE: 869 int/2465 35 98 33 int/2635 100 98 40 int/2636 
+28 7 17 int/2463 72 7 17
+
+[WS1] Parsed command: 869
+[WS1] RAW MESSAGE: 900 Prison*5 100 1
+
+[WS1] Parsed command: 900
+[LOG1] ≡ƒôì Planet: Prison*5 100 1
+
+[WS1] 900 message - Planet: Prison*5
+[WS1] RAW MESSAGE: 332 0 :N╨╡ver share ur recovery code, registered e
+mail & mobile number!
+
+[WS1] Parsed command: 332
+[WS1] 332 message received: 332 0 :N╨╡ver share ur recovery code, reg
+istered email & mobile number!
+
+[WS1] ≡ƒö┤ PRISON CONFIRMED via 332 "recovery" keyword
+[LOG1] ≡ƒö┤ Prison detected (332 message)
+[WS1] Escape already in progress - skipping duplicate attempt        
+[WS1] RAW MESSAGE: JOIN TEAM_SPARROW `[R]OLE[X]` 54531773 0 -2 hb/417
+_ 0 -70 33 0 9039_ 0 0 33 0 158 -1 -1 -1
+
+[WS1] Parsed command: JOIN
+[WS1] JOIN - Config check: {
+  modena: false,
+  lowsecmode: false,
+  kickmode: false,
+  kickall: false,
+  kickbybl: true,
+  dadplus: false
+}
+[WS1] JOIN - Founder ID: NONE
+[WS1] JOIN - kickModeEnabled: true
+[WS1] JOIN - Routing to Kick/Imprison mode
+[WS1] RAW MESSAGE: 881
+
+[WS1] Parsed command: 881
+
+[WS1] RAW MESSAGE: 860 54531773 13908 1;aura/0_5;0;0;33
+
+[WS1] Parsed command: 860
+[WS1] RAW MESSAGE: OBJ_ADD 497214 14 51487 0 0 :105
+
+[WS1] Parsed command: OBJ_ADD
+[WS1] RAW MESSAGE: OBJ_STATUS_SET 497214 1 1
+
+[WS1] Parsed command: OBJ_STATUS_SET
+[WS1] Calling escapeAll()...
+[WS1] ≡ƒöô Starting escape attempt...
+[LOG1] ≡ƒöô Attempting escape...
+[WS1] Escape attempt: userID=54531773, label=RC1
+[WS1] Trying 1 recovery code(s)...
+[WS1] RC1 escape response: {"freeResult":{"success":true},"type":"esc
+apeItemDiamond"}
+[WS1] RC1: Escape successful!
+[LOG1] Γ£à RC1 escape successful!
+[WS1] Γ£à Escape API call successful!
+[LOG1] Γ£à Escape successful!
+[WS1] escapeAll() result: true
+[WS1] RAW MESSAGE: :Supervisor KICKP :<style>.s__header{position:abso
+lute;top:0;left:0;right:0;height:78px;text-align:center;background:ur
+l(https://galaxy.mobstudio.ru/services/img/astral/galaxy2@2x.png) cen
+ter 19px no-
+[WS1] Parsed command: :Supervisor
+[LOG1] ≡ƒöä Rejoining THE_BOT
+[WS1] RAW MESSAGE: 852 11099 :[A] Fireworks
+852 1121 :[A] Bury in grave
+852 3 :Imprison
+
+[WS1] Parsed command: 852
+[WS1] RAW MESSAGE: 853
+
+[WS1] Parsed command: 853
+
+[WS1] RAW MESSAGE: 353 1 = THE_BOT :TEAM_SPARROW @``THALA`` 14358744 
+-10 hb/111114_ 0 -73 33 0 w/272_2_ 0 0 33 0 w/9887_2_ 0 0 33 0 w/6922
+_2_ 0 0 33 0 w/1148_2_ 0 0 33 0 w/3053_2_ 0 0 33 0 w/4920_2_ 0 0 33 0
+ w/b_0_2_1_
+[WS1] Parsed command: 353
+[WS1] 353 message received - Planet: THE_BOT
+[WS1] Loaded founder from memory: 14358744
+[LOG1] ≡ƒææ Planet founder (from memory): 14358744
+[WS1] Founder ID: 14358744
+[LOG1] ≡ƒôï 353 - Users on THE_BOT
+[WS1] 353 - Config check: {
+  modena: false,
+  kickmode: false,
+  kickall: false,
+  kickbybl: true,
+  dadplus: false
+}
+[WS1] 353 - kickModeEnabled: true
+[WS1] 353 - Routing to Kick/Imprison mode
+[WS1] 353 - Using founder ID for filtering: 14358744
+[WS1] 353 Imprison mode - Processing user list
+[WS1] 353 Imprison mode options - Everyone=false, ByBlacklist=true, D
+ad+=false
+[WS1] 353 - Found 2 user IDs: [14358744, 54531773]
+[WS1] 353 - Self ID: 54531773, Founder ID: 14358744
+[WS1] 353 Imprison mode - Blacklist Users: [?????????????]
+[WS1] 353 Imprison mode - Blacklist Clans: []
+[WS1] 353 Imprison mode - No users to imprison
+[LOG1] Γ£à No users in blacklist found on planet
+[WS1] RAW MESSAGE: 366 :end of names
+
+[WS1] Parsed command: 366
+[WS1] RAW MESSAGE: FOUNDER 14358744 cr/21
+
+[WS1] Parsed command: FOUNDER
+[WS1] FOUNDER detected: 14358744
+[LOG1] ≡ƒææ Planet founder: 14358744
+[FounderMemory] Stored THE_BOT ΓåÆ 14358744
+[WS1] Saved founder to file: THE_BOT ΓåÆ 14358744
+[WS1] RAW MESSAGE: 860 14358744 301215 1;aura/0_7;0;0;33 54531773 139
+08 1;aura/0_5;0;0;33
+
+[WS1] Parsed command: 860
+[WS1] RAW MESSAGE: 900 THE_BOT 20 6
+
+[WS1] Parsed command: 900
+[LOG1] ≡ƒôì Planet: THE_BOT 20 6
+
+[WS1] 900 message - Planet: THE_BOT
+[WS1] RAW MESSAGE: 332 0 :Galaxy Kick L**k 2.0 Is ON the Way
+
+[WS1] Parsed command: 332
+[WS1] 332 message received: 332 0 :Galaxy Kick L**k 2.0 Is ON the Way
+
+[WS1] RAW MESSAGE: JOIN TEAM_SPARROW `[R]OLE[X]` 54531773 0 -5 hb/417
+_ 0 -73 33 0 w/2410_2_ 0 0 33 0 w/5398_2_ 0 0 33 0 w/b_0_2_0_ 0 0 33 
+0 @ 107 46 117 112 80 -1 -1 -1
+
+[WS1] Parsed command: JOIN
+[WS1] JOIN - Config check: {
+  modena: false,
+  lowsecmode: false,
+  kickmode: false,
+  kickall: false,
+  kickbybl: true,
+  dadplus: false
+}
+[WS1] JOIN - Founder ID: 14358744
+[WS1] JOIN - kickModeEnabled: true
+[WS1] JOIN - Routing to Kick/Imprison mode
+[WS1] RAW MESSAGE: 881
+
+[WS1] Parsed command: 881
+
+[WS1] RAW MESSAGE: 860 54531773 13908 1;aura/0_5;0;0;33
+
+[WS1] Parsed command: 860
+[FounderMemory] Saved to file

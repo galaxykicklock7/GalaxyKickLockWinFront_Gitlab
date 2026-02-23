@@ -1,0 +1,199 @@
+[01:02:44]✅ Connection established
+
+[01:02:44]Recovering with code: onfoqk2ff1
+
+[01:02:45]Registered as: `[R]OLE[X]`
+
+[01:02:45]Connection established. Joining THE_BOT
+
+[01:02:45]🤖 Bot gang: team_sparrow
+
+[01:02:45]👑 Planet founder (from memory): 14358744
+
+[01:02:45]📋 353 - Users on THE_BOT
+
+[01:02:45]👑 Skipping planet owner: 14358744
+
+[01:02:45]✅ No users in blacklist found on planet
+
+[01:02:45]👑 Planet founder: 14358744
+
+[01:02:45]📍 Planet: THE_BOT 20 6
+
+[01:03:24]⚡ Auto Attack aradhya} in 1965ms
+
+[01:03:26]⚔️ Imprisoning aradhya} (57176962) - Reason: everyone
+
+[01:03:26]🚪 QUIT after imprison
+
+[01:03:26]⏰ OffSleep START (connected=true, retry=0)
+
+[01:03:26]⏳ Waiting for connection to close
+
+[01:03:26]⏱️ Reconnect in 0s (retry 1/10)
+
+[01:03:26]💾 Stored timeoutId=9211
+
+[01:03:26]❌ 3-second error - Too slow!
+
+[01:03:26]⏫ Timing attack1 increased to 1970ms (+5ms)
+
+[01:03:26]📊 Status unknown - adjusting attack timing
+
+[01:03:26]ℹ️ :You can imprison only in 3s after you appear on Planet. You can't imprison more
+
+[01:03:26]⚠️ Connection closed (code: 1006)
+
+[01:03:26]⏰ Timeout fired! Checking connected=true
+
+[01:03:26]✅ Proceeding with RECONNECT!
+
+[01:03:26]🔄 Auto-reconnecting WS1 (normal mode)...
+
+[01:03:26]📍 Using main code (rotation disabled)
+
+[01:03:28]✅ Connection established
+
+[01:03:28]Recovering with code: onfoqk2ff1
+
+[01:03:28]Registered as: `[R]OLE[X]`
+
+[01:03:28]Connection established. Joining THE_BOT
+
+[01:03:29]🤖 Bot gang: team_sparrow
+
+[01:03:29]👑 Planet founder (from memory): 14358744
+
+[01:03:29]📋 353 - Users on THE_BOT
+
+[01:03:29]👑 Skipping planet owner: 14358744
+
+[01:03:29]✅ No users in blacklist found on planet
+
+[01:03:29]📋 353 - Users on THE_BOT
+
+[01:03:29]⚔️ Found 1 user(s) to imprison
+
+[01:03:29]⚡ Auto Attack in 1970ms
+
+[01:03:29]👑 Planet founder: 14358744
+
+[01:03:29]📍 Planet: THE_BOT 20 6
+
+[01:03:31]⚔️ Imprisoning aradhya} (57176962) - everyone
+
+[01:03:31]🚪 QUIT after imprison
+
+[01:03:31]🔍 Check: sleeping=true, connected=true
+
+[01:03:31]✅ Calling OffSleep (353 handler)
+
+[01:03:31]⏰ OffSleep START (connected=true, retry=0)
+
+[01:03:31]⏳ Waiting for connection to close
+
+[01:03:31]⏱️ Reconnect in 0s (retry 1/10)
+
+[01:03:31]💾 Stored timeoutId=9714
+
+[01:03:31]❌ 3-second error - Too slow!
+
+[01:03:31]⏫ Timing attack1 increased to 1975ms (+5ms)
+
+[01:03:31]📊 Status unknown - adjusting attack timing
+
+[01:03:31]ℹ️ :You can imprison only in 3s after you appear on Planet. You can't imprison more
+
+[01:03:31]⚠️ Connection closed (code: 1006)
+
+[01:03:32]⏰ Timeout fired! Checking connected=true
+
+[01:03:32]✅ Proceeding with RECONNECT!
+
+[01:03:32]🔄 Auto-reconnecting WS1 (normal mode)...
+
+[01:03:32]📍 Using main code (rotation disabled)
+
+[01:03:33]✅ Connection established
+
+[01:03:33]Recovering with code: onfoqk2ff1
+
+[01:03:33]Registered as: `[R]OLE[X]`
+
+[01:03:33]Connection established. Joining THE_BOT
+
+[01:03:33]🤖 Bot gang: team_sparrow
+
+[01:03:33]👑 Planet founder (from memory): 14358744
+
+[01:03:33]📋 353 - Users on THE_BOT
+
+[01:03:33]👑 Skipping planet owner: 14358744
+
+[01:03:33]✅ No users in blacklist found on planet
+
+[01:03:33]📋 353 - Users on THE_BOT
+
+[01:03:33]⚔️ Found 1 user(s) to imprison
+
+[01:03:33]⚡ Auto Attack in 1975ms
+
+[01:03:33]👑 Planet founder: 14358744
+
+[01:03:33]📍 Planet: THE_BOT 20 6
+
+[01:03:35]⚔️ Imprisoning aradhya} (57176962) - everyone
+
+[01:03:35]🚪 QUIT after imprison
+
+[01:03:35]🔍 Check: sleeping=true, connected=true
+
+[01:03:35]✅ Calling OffSleep (353 handler)
+
+[01:03:35]⏰ OffSleep START (connected=true, retry=0)
+
+[01:03:35]⏳ Waiting for connection to close
+
+[01:03:35]⏱️ Reconnect in 0s (retry 1/10)
+
+[01:03:35]💾 Stored timeoutId=10199
+
+[01:03:36]✅ Success - Imprisoned target!
+
+[01:03:36]⚠️ Timing attack1 at minimum (2100ms)
+
+[01:03:36]📊 Status unknown - optimizing attack timing
+
+[01:03:36]ℹ️ :Your Authority allows you to imprison for 4d 19h 9min (Next time you'll be allo
+
+[01:03:36]⚠️ Connection closed (code: 1006)
+
+[01:03:36]⏰ Timeout fired! Checking connected=true
+
+[01:03:36]✅ Proceeding with RECONNECT!
+
+[01:03:36]🔄 Auto-reconnecting WS1 (normal mode)...
+
+[01:03:36]📍 Using main code (rotation disabled)
+
+[01:03:37]✅ Connection established
+
+[01:03:37]Recovering with code: onfoqk2ff1
+
+[01:03:38]Registered as: `[R]OLE[X]`
+
+[01:03:38]Connection established. Joining THE_BOT
+
+[01:03:38]🤖 Bot gang: team_sparrow
+
+[01:03:38]👑 Planet founder (from memory): 14358744
+
+[01:03:38]📋 353 - Users on THE_BOT
+
+[01:03:38]👑 Skipping planet owner: 14358744
+
+[01:03:38]✅ No users in blacklist found on planet
+
+[01:03:38]👑 Planet founder: 14358744
+
+[01:03:38]📍 Planet: THE_BOT 20 6

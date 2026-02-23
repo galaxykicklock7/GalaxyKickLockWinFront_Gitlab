@@ -3,8 +3,10 @@ import { FaAndroid, FaApple, FaGlobe, FaSignOutAlt, FaRocket, FaWifi, FaCloudUpl
 import { triggerGitLabPipeline, pollGitLabPipelineUntilRunning, cancelGitLabPipeline, getLatestRunningGitLabPipeline } from '../../utils/gitlab';
 import { setBackendUrl, clearBackendUrl } from '../../utils/backendUrl';
 import { storageManager } from '../../utils/storageManager';
+import { tunnelStorage } from '../../utils/tunnelStorage';
 import DeploymentModal from '../DeploymentModal';
 import ConfirmModal from '../ConfirmModal';
+import ProfileModal from '../ProfileModal';
 import './PremiumLayout.css';
 
 const CommandBar = ({
@@ -18,7 +20,7 @@ const CommandBar = ({
     loading,
     onLogout,
     currentUser,
-    onDeploymentSuccess, // Callback to start workflow monitoring
+    onDeploymentSuccess, // Callback to start deployment monitoring
     showToast // Toast function from App.jsx
 }) => {
     const [deploymentStatus, setDeploymentStatus] = useState('idle'); // idle, deploying, deployed, failed
@@ -29,14 +31,16 @@ const CommandBar = ({
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [confirmModalConfig, setConfirmModalConfig] = useState({});
     const [isDeactivating, setIsDeactivating] = useState(false);
-    const [localTestMode, setLocalTestMode] = useState(false);
     const [isReleasing, setIsReleasing] = useState(false);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     // Check if deployment is already done (persisted in storage)
     useEffect(() => {
         const savedDeploymentStatus = storageManager.getItem('deploymentStatus');
         const savedPipelineId = storageManager.getItem('pipelineId');
-        const savedLocalTest = storageManager.getItem('localTestMode') === 'true';
+        
+        // Clean up any old localTestMode settings
+        storageManager.removeItem('localTestMode');
         
         if (savedDeploymentStatus === 'deployed') {
             setDeploymentStatus('deployed');
@@ -44,17 +48,13 @@ const CommandBar = ({
                 setCurrentRunId(parseInt(savedPipelineId));
             }
         }
-        
-        if (savedLocalTest) {
-            setLocalTestMode(true);
-        }
     }, []);
 
-    // Listen for deployment status changes (from workflow monitor)
+    // Listen for deployment status changes (from deployment monitor)
     useEffect(() => {
         const handleDeploymentChange = (e) => {
             if (e.detail.status === 'idle') {
-                // Workflow stopped - reset to idle state
+                // Deployment stopped - reset to idle state
                 setDeploymentStatus('idle');
                 setCurrentRunId(null);
                 setIsDeploying(false);
@@ -89,35 +89,6 @@ const CommandBar = ({
     const isExpired = (dateString) => {
         if (!dateString) return false;
         return new Date(dateString) < new Date();
-    };
-
-    const handleLocalTest = () => {
-        const newLocalTestMode = !localTestMode;
-        setLocalTestMode(newLocalTestMode);
-        
-        if (newLocalTestMode) {
-            // Enable local test mode
-            setBackendUrl('http://localhost:3000');
-            storageManager.setItem('localTestMode', 'true');
-            storageManager.setItem('deploymentStatus', 'deployed');
-            setDeploymentStatus('deployed');
-            
-            // Trigger custom event
-            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', { 
-                detail: { status: 'deployed', backendUrl: 'http://localhost:3000' } 
-            }));
-        } else {
-            // Disable local test mode
-            clearBackendUrl();
-            storageManager.removeItem('localTestMode');
-            storageManager.removeItem('deploymentStatus');
-            setDeploymentStatus('idle');
-            
-            // Trigger custom event
-            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', { 
-                detail: { status: 'idle' } 
-            }));
-        }
     };
 
     const handleDeploy = async () => {
@@ -189,6 +160,26 @@ const CommandBar = ({
             storageManager.setItem('deploymentStatus', 'deployed');
             storageManager.setItem('pipelineId', triggerResult.pipeline_id.toString());
 
+            // ✅ FIXED: Clear old tunnels from previous deployments
+            // Old tunnels are now offline, so remove them to avoid confusion
+            tunnelStorage.clearAllTunnels();
+            console.log(`🌐 Cleared old tunnels from previous deployments`);
+
+            // ✅ NEW: Add 3 NEW tunnels from current deployment
+            const tunnel1Url = `https://${subdomain}-tunnel1.loca.lt`;
+            const tunnel2Url = `https://${subdomain}-tunnel2.loca.lt`;
+            const tunnel3Url = `https://${subdomain}-tunnel3.loca.lt`;
+
+            tunnelStorage.addTunnel(tunnel1Url);
+            tunnelStorage.addTunnel(tunnel2Url);
+            tunnelStorage.addTunnel(tunnel3Url);
+            tunnelStorage.setActiveTunnel(tunnel1Url);
+
+            console.log(`🌐 NEW TUNNELS REGISTERED:`);
+            console.log(`   Tunnel 1: ${tunnel1Url}`);
+            console.log(`   Tunnel 2: ${tunnel2Url}`);
+            console.log(`   Tunnel 3: ${tunnel3Url}`);
+
             // Step 2: Pipeline triggered (20%)
             setDeploymentProgress({ percentage: 20, message: 'System initialized...' });
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -230,7 +221,7 @@ const CommandBar = ({
                 detail: { status: 'deployed', backendUrl } 
             }));
             
-            // Start pipeline monitoring to detect if backend stops
+            // Start deployment monitoring to detect if backend stops
             if (onDeploymentSuccess && triggerResult.pipeline_id) {
                 onDeploymentSuccess(triggerResult.pipeline_id);
             }
@@ -319,7 +310,6 @@ const CommandBar = ({
                 setDeploymentStatus('idle');
                 setCurrentRunId(null);
                 setIsDeactivating(false);
-                setLocalTestMode(false);
                 clearBackendUrl();
                 storageManager.removeItem('deploymentStatus');
                 storageManager.removeItem('pipelineId');
@@ -416,47 +406,29 @@ const CommandBar = ({
         <div className="command-bar">
             {/* LEFT: ACTION CLUSTER */}
             <div className="action-cluster">
-                {/* LOCAL TEST Button - Only visible in development */}
-                {isDevelopment && (
+                {/* DEPLOY/UNDEPLOY Button */}
+                {deploymentStatus !== 'deployed' ? (
                     <button
-                        className={`hex-btn ${localTestMode ? 'btn-undeploy' : 'btn-local-test'}`}
-                        onClick={handleLocalTest}
-                        disabled={deploymentStatus === 'deployed' && !localTestMode}
-                        title={localTestMode ? 'Disable Local Test Mode' : 'Enable Local Test Mode (localhost:3000)'}
-                        style={{
-                            backgroundColor: localTestMode ? '#ff6b35' : '#4a90e2',
-                            borderColor: localTestMode ? '#ff6b35' : '#4a90e2'
-                        }}
+                        className="hex-btn btn-deploy"
+                        onClick={handleDeploy}
+                        disabled={isDeploying}
+                        title="Activate Galaxy Kick Lock 2.0"
                     >
-                        <FaWifi /> {localTestMode ? 'LOCAL: ON' : 'LOCAL TEST'}
+                        <FaCloudUploadAlt /> {isDeploying ? 'ACTIVATING...' : 'ACTIVATE'}
+                    </button>
+                ) : (
+                    <button
+                        className="hex-btn btn-undeploy"
+                        onClick={handleUndeploy}
+                        disabled={isDeploying}
+                        title="Deactivate Galaxy Kick Lock 2.0"
+                    >
+                        <FaTimesCircle /> DEACTIVATE
                     </button>
                 )}
 
-                {/* DEPLOY/UNDEPLOY Button - Only visible when not in local test mode */}
-                {!localTestMode && (
-                    deploymentStatus !== 'deployed' ? (
-                        <button
-                            className="hex-btn btn-deploy"
-                            onClick={handleDeploy}
-                            disabled={isDeploying}
-                            title="Activate Galaxy Kick Lock 2.0"
-                        >
-                            <FaCloudUploadAlt /> {isDeploying ? 'ACTIVATING...' : 'ACTIVATE'}
-                        </button>
-                    ) : (
-                        <button
-                            className="hex-btn btn-undeploy"
-                            onClick={handleUndeploy}
-                            disabled={isDeploying}
-                            title="Deactivate Galaxy Kick Lock 2.0"
-                        >
-                            <FaTimesCircle /> DEACTIVATE
-                        </button>
-                    )
-                )}
-
-                {/* Other buttons - Only visible after deployment or local test */}
-                {(deploymentStatus === 'deployed' || localTestMode) && (
+                {/* Other buttons - Only visible after deployment */}
+                {deploymentStatus === 'deployed' && (
                     <>
                         <button
                             className="hex-btn btn-connect"
@@ -486,28 +458,29 @@ const CommandBar = ({
             </div>
 
             {/* MIDDLE: NAVIGATION DECK */}
-            <div className={`nav-deck ${deploymentStatus !== 'deployed' && !localTestMode ? 'nav-deck-disabled' : ''}`}>
-                <span style={{ fontSize: '11px', color: '#fff', fontFamily: 'Orbitron', fontWeight: 700 }}>PLANET NAME</span>
+            <div className={`nav-deck ${deploymentStatus !== 'deployed' ? 'nav-deck-disabled' : ''}`}>
+                <span style={{ fontSize: '10px', color: '#fff', fontFamily: 'Orbitron', fontWeight: 700, whiteSpace: 'nowrap' }}>PLANET</span>
                 <input
                     type="text"
                     className="nav-input"
-                    placeholder="Enter planet name..."
+                    placeholder="Enter planet..."
                     value={config.planet}
                     onChange={(e) => onConfigChange('planet', e.target.value)}
-                    style={{ width: '220px' }}
-                    disabled={deploymentStatus !== 'deployed' && !localTestMode}
+                    style={{ width: '180px' }}
+                    disabled={deploymentStatus !== 'deployed'}
                 />
                 <button
                     className="fly-btn"
                     onClick={onFlyToPlanet}
-                    disabled={!connected || !config.planet || (deploymentStatus !== 'deployed' && !localTestMode)}
+                    disabled={!connected || !config.planet || deploymentStatus !== 'deployed'}
+                    style={{ marginLeft: '-2px' }}
                 >
                     <FaRocket /> FLY
                 </button>
                 
                 {/* RECONNECT FIELD */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '15px' }}>
-                    <span style={{ fontSize: '11px', color: '#fff', fontFamily: 'Orbitron', fontWeight: 700 }}>RECONNECT</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '10px' }}>
+                    <span style={{ fontSize: '10px', color: '#fff', fontFamily: 'Orbitron', fontWeight: 700, whiteSpace: 'nowrap' }}>RECONNECT</span>
                     <input
                         type="number"
                         className="nav-input"
@@ -515,58 +488,66 @@ const CommandBar = ({
                         value={config.reconnect || ''}
                         onChange={(e) => onConfigChange('reconnect', parseInt(e.target.value) || 0)}
                         title="Reconnect delay in milliseconds"
-                        style={{ width: '80px', textAlign: 'center' }}
-                        disabled={deploymentStatus !== 'deployed' && !localTestMode}
+                        style={{ width: '70px', textAlign: 'center' }}
+                        disabled={deploymentStatus !== 'deployed'}
                     />
                 </div>
             </div>
 
             {/* RIGHT: SYSTEM STATUS */}
-            <div className={`system-status ${deploymentStatus !== 'deployed' && !localTestMode ? 'system-status-disabled' : ''}`}>
+            <div className={`system-status ${deploymentStatus !== 'deployed' ? 'system-status-disabled' : ''}`}>
                 <div className="device-selector">
                     <FaAndroid
                         className={`dev-icon ${config.device === '312' ? 'active' : ''}`}
-                        onClick={() => (deploymentStatus === 'deployed' || localTestMode) && onConfigChange('device', '312')}
+                        onClick={() => deploymentStatus === 'deployed' && onConfigChange('device', '312')}
                         title="Android"
-                        style={{ cursor: (deploymentStatus === 'deployed' || localTestMode) ? 'pointer' : 'not-allowed' }}
+                        style={{ cursor: deploymentStatus === 'deployed' ? 'pointer' : 'not-allowed' }}
                     />
                     <FaApple
                         className={`dev-icon ${config.device === '323' ? 'active' : ''}`}
-                        onClick={() => (deploymentStatus === 'deployed' || localTestMode) && onConfigChange('device', '323')}
+                        onClick={() => deploymentStatus === 'deployed' && onConfigChange('device', '323')}
                         title="iOS"
-                        style={{ cursor: (deploymentStatus === 'deployed' || localTestMode) ? 'pointer' : 'not-allowed' }}
+                        style={{ cursor: deploymentStatus === 'deployed' ? 'pointer' : 'not-allowed' }}
                     />
                     <FaGlobe
                         className={`dev-icon ${config.device === '352' ? 'active' : ''}`}
-                        onClick={() => (deploymentStatus === 'deployed' || localTestMode) && onConfigChange('device', '352')}
+                        onClick={() => deploymentStatus === 'deployed' && onConfigChange('device', '352')}
                         title="Web"
-                        style={{ cursor: (deploymentStatus === 'deployed' || localTestMode) ? 'pointer' : 'not-allowed' }}
+                        style={{ cursor: deploymentStatus === 'deployed' ? 'pointer' : 'not-allowed' }}
                     />
                 </div>
 
                 <div className="user-profile">
                     {currentUser && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                            <span style={{ fontSize: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: '1px', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)' }}>
-                                {currentUser.username.toUpperCase()}
-                            </span>
-                            <span style={{ 
-                                fontSize: '11px', 
-                                color: isExpired(currentUser.token_expiry_date) ? '#ff4444' : '#00ff88', 
+                        <span 
+                            style={{ 
+                                fontSize: '14px', 
+                                color: '#00f3ff', 
                                 fontFamily: 'Orbitron', 
-                                fontWeight: 600,
-                                textShadow: isExpired(currentUser.token_expiry_date) ? '0 0 8px rgba(255, 68, 68, 0.6)' : '0 0 8px rgba(0, 255, 136, 0.6)'
-                            }}>
-                                {isExpired(currentUser.token_expiry_date) ? '⚠️ ' : '🔒 '}
-                                EXPIRES: {formatExpiryDate(currentUser.token_expiry_date)}
-                            </span>
-                        </div>
+                                fontWeight: 700, 
+                                letterSpacing: '0.5px', 
+                                textShadow: '0 0 10px rgba(0, 243, 255, 0.5)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            onClick={() => setShowProfileModal(true)}
+                            onMouseEnter={(e) => {
+                                e.target.style.color = '#00d4ff';
+                                e.target.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.color = '#00f3ff';
+                                e.target.style.transform = 'scale(1)';
+                            }}
+                            title="Click to view profile"
+                        >
+                            {currentUser.username.toUpperCase()}
+                        </span>
                     )}
                     <button 
                         className="logout-btn-mini" 
                         onClick={onLogout} 
                         title="Logout"
-                        disabled={deploymentStatus !== 'deployed'}
                     >
                         <FaSignOutAlt /> LOGOUT
                     </button>
@@ -591,6 +572,13 @@ const CommandBar = ({
                 type={confirmModalConfig.type}
                 onConfirm={confirmModalConfig.onConfirm}
                 onCancel={() => setShowConfirmModal(false)}
+            />
+
+            {/* Profile Modal */}
+            <ProfileModal
+                isOpen={showProfileModal}
+                currentUser={currentUser}
+                onClose={() => setShowProfileModal(false)}
             />
         </div>
     );

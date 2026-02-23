@@ -5,6 +5,8 @@ import './PremiumLayout.css';
 const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
     // Auto-switch tab based on protocol selection, but allow manual override
     const [manualTab, setManualTab] = useState(null);
+    const [usernameListType, setUsernameListType] = useState('blacklist'); // 'blacklist' or 'whitelist'
+    const [clanListType, setClanListType] = useState('blacklist'); // 'blacklist' or 'whitelist'
     
     // Determine active tab
     let activeTab;
@@ -82,26 +84,98 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
             </div>
 
             <div className="security-content">
+                {/* Target Usernames Section */}
                 <div className="list-container">
-                    <span className="section-label">TARGET USERNAMES</span>
+                    <div className="section-header">
+                        <span className="section-label">TARGET USERNAMES</span>
+                        <div className="list-type-tabs">
+                            <button
+                                className={`list-type-tab ${usernameListType === 'blacklist' ? 'active' : ''}`}
+                                onClick={() => setUsernameListType('blacklist')}
+                            >
+                                BLACKLIST
+                            </button>
+                            <button
+                                className={`list-type-tab ${usernameListType === 'whitelist' ? 'active' : ''}`}
+                                onClick={() => setUsernameListType('whitelist')}
+                            >
+                                WHITELIST
+                            </button>
+                        </div>
+                    </div>
                     <textarea
                         className="db-textarea"
-                        value={activeTab === 'IMPRISON' ? config.blacklist : config.kblacklist}
-                        onChange={(e) => handleTargetChange(activeTab === 'IMPRISON' ? 'blacklist' : 'kblacklist', e.target.value)}
-                        placeholder="ENTER TARGETS..."
+                        value={
+                            usernameListType === 'blacklist'
+                                ? (activeTab === 'IMPRISON' ? config.blacklist : config.kblacklist)
+                                : (activeTab === 'IMPRISON' ? config.whitelist : config.kwhitelist)
+                        }
+                        onChange={(e) => {
+                            const field = usernameListType === 'blacklist'
+                                ? (activeTab === 'IMPRISON' ? 'blacklist' : 'kblacklist')
+                                : (activeTab === 'IMPRISON' ? 'whitelist' : 'kwhitelist');
+                            handleTargetChange(field, e.target.value);
+                        }}
+                        placeholder={
+                            usernameListType === 'blacklist'
+                                ? "ENTER TARGETS TO ATTACK..."
+                                : "ENTER USERS TO SKIP..."
+                        }
                         style={{ color: '#fff' }}
                     />
+                    <div className="list-hint">
+                        {usernameListType === 'blacklist' 
+                            ? '⚔️ Users in blacklist will be targeted'
+                            : '🛡️ Users in whitelist will be skipped'
+                        }
+                    </div>
                 </div>
 
+                {/* Target Clans Section */}
                 <div className="list-container">
-                    <span className="section-label">TARGET CLANS</span>
+                    <div className="section-header">
+                        <span className="section-label">TARGET CLANS</span>
+                        <div className="list-type-tabs">
+                            <button
+                                className={`list-type-tab ${clanListType === 'blacklist' ? 'active' : ''}`}
+                                onClick={() => setClanListType('blacklist')}
+                            >
+                                BLACKLIST
+                            </button>
+                            <button
+                                className={`list-type-tab ${clanListType === 'whitelist' ? 'active' : ''}`}
+                                onClick={() => setClanListType('whitelist')}
+                            >
+                                WHITELIST
+                            </button>
+                        </div>
+                    </div>
                     <textarea
                         className="db-textarea"
-                        value={activeTab === 'IMPRISON' ? config.gangblacklist : config.kgangblacklist}
-                        onChange={(e) => handleTargetChange(activeTab === 'IMPRISON' ? 'gangblacklist' : 'kgangblacklist', e.target.value)}
-                        placeholder="ENTER CLANS..."
+                        value={
+                            clanListType === 'blacklist'
+                                ? (activeTab === 'IMPRISON' ? config.gangblacklist : config.kgangblacklist)
+                                : (activeTab === 'IMPRISON' ? config.gangwhitelist : config.kgangwhitelist)
+                        }
+                        onChange={(e) => {
+                            const field = clanListType === 'blacklist'
+                                ? (activeTab === 'IMPRISON' ? 'gangblacklist' : 'kgangblacklist')
+                                : (activeTab === 'IMPRISON' ? 'gangwhitelist' : 'kgangwhitelist');
+                            handleTargetChange(field, e.target.value);
+                        }}
+                        placeholder={
+                            clanListType === 'blacklist'
+                                ? "ENTER CLANS TO ATTACK..."
+                                : "ENTER CLANS TO SKIP..."
+                        }
                         style={{ color: '#fff' }}
                     />
+                    <div className="list-hint">
+                        {clanListType === 'blacklist' 
+                            ? '⚔️ Clan members in blacklist will be targeted'
+                            : '🛡️ Clan members in whitelist will be skipped'
+                        }
+                    </div>
                 </div>
             </div>
         </div>

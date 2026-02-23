@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        h1 {
+            color: #00ff88;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00dd77;
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            background: #004400;
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        .error {
+            background: #440000;
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+        .info {
+            background: #333;
+            border: 1px solid #888;
+            color: #aaa;
+        }
+        .loading {
+            color: #ffaa00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 CORS Test Tool</h1>
+    <p>Test CORS connectivity between Vercel frontend and loca.lt backend</p>
+
+    <div class="test-section">
+        <h2>Backend URL</h2>
+        <input 
+            type="text" 
+            id="backendUrl" 
+            placeholder="https://bharanitest898.loca.lt"
+            value="https://bharanitest898.loca.lt"
+        />
+        <button onclick="testTimerStatus()">Test Timer Status</button>
+        <button onclick="testCheckStuck()">Test Check Stuck</button>
+        <button onclick="testMetrics()">Test Metrics</button>
+        <button onclick="testAllEndpoints()">Test All Endpoints</button>
+        <div id="result" class="result info">Results will appear here...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>Quick Tests</h2>
+        <button onclick="testCORSHeaders()">Check CORS Headers</button>
+        <button onclick="testPreflight()">Test Preflight (OPTIONS)</button>
+        <button onclick="testFromLocalStorage()">Test from localStorage URL</button>
+        <div id="quickResult" class="result info">Quick test results...</div>
+    </div>
+
+    <script>
+        const resultDiv = document.getElementById('result');
+        const quickResultDiv = document.getElementById('quickResult');
+
+        function getBackendUrl() {
+            return document.getElementById('backendUrl').value.trim();
+        }
+
+        function showResult(element, message, type = 'info') {
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        function showLoading(element, message) {
+            element.className = 'result loading';
+            element.textContent = `⏳ ${message}`;
+        }
+
+        async function testTimerStatus() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(resultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(resultDiv, 'Testing /api/timer-status/1...');
+
+            try {
+                const response = await fetch(`${url}/api/timer-status/1`, {
+                    headers: {
+                        'bypass-tunnel-reminder': 'true'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, 
+                        `✅ SUCCESS!\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}\n\n` +
+                        `CORS Headers:\n` +
+                        `Access-Control-Allow-Origin: ${response.headers.get('Access-Control-Allow-Origin')}\n` +
+                        `Access-Control-Allow-Methods: ${response.headers.get('Access-Control-Allow-Methods')}`,
+                        'success'
+                    );
+                } else {
+                    showResult(resultDiv, 
+                        `⚠️ Request succeeded but returned error:\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(resultDiv, 
+                    `❌ CORS ERROR!\n\n` +
+                    `Error: ${error.message}\n\n` +
+                    `This usually means:\n` +
+                    `1. Backend is not running\n` +
+                    `2. CORS headers not set correctly\n` +
+                    `3. Backend URL is wrong\n\n` +
+                    `Check backend logs for CORS messages.`,
+                    'error'
+                );
+            }
+        }
+
+        async function testCheckStuck() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(resultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(resultDiv, 'Testing /api/check-stuck-at-max/1...');
+
+            try {
+                const response = await fetch(`${url}/api/check-stuck-at-max/1`, {
+                    headers: {
+                        'bypass-tunnel-reminder': 'true',
+                        'x-user-id': 'test-user-123'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, 
+                        `✅ SUCCESS!\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        'success'
+                    );
+                } else {
+                    showResult(resultDiv, 
+                        `⚠️ Request succeeded but returned error:\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(resultDiv, 
+                    `❌ CORS ERROR!\n\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testMetrics() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(resultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(resultDiv, 'Testing /api/metrics/1...');
+
+            try {
+                const response = await fetch(`${url}/api/metrics/1`, {
+                    headers: {
+                        'bypass-tunnel-reminder': 'true',
+                        'x-user-id': 'test-user-123'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(resultDiv, 
+                        `✅ SUCCESS!\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        'success'
+                    );
+                } else {
+                    showResult(resultDiv, 
+                        `⚠️ Request succeeded but returned error:\n\n` +
+                        `Status: ${response.status}\n` +
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(resultDiv, 
+                    `❌ CORS ERROR!\n\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testAllEndpoints() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(resultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(resultDiv, 'Testing all endpoints...');
+
+            const endpoints = [
+                '/api/timer-status/1',
+                '/api/check-stuck-at-max/1',
+                '/api/metrics/1',
+                '/api/ai/stats/1'
+            ];
+
+            let results = 'Testing all endpoints:\n\n';
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(`${url}${endpoint}`, {
+                        headers: {
+                            'bypass-tunnel-reminder': 'true',
+                            'x-user-id': 'test-user-123'
+                        }
+                    });
+
+                    if (response.ok) {
+                        results += `✅ ${endpoint} - OK (${response.status})\n`;
+                    } else {
+                        results += `⚠️ ${endpoint} - Error (${response.status})\n`;
+                    }
+                } catch (error) {
+                    results += `❌ ${endpoint} - CORS Error: ${error.message}\n`;
+                }
+            }
+
+            showResult(resultDiv, results, 'info');
+        }
+
+        async function testCORSHeaders() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(quickResultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(quickResultDiv, 'Checking CORS headers...');
+
+            try {
+                const response = await fetch(`${url}/api/timer-status/1`, {
+                    headers: {
+                        'bypass-tunnel-reminder': 'true'
+                    }
+                });
+
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+
+                showResult(quickResultDiv, 
+                    `CORS Headers:\n\n${JSON.stringify(corsHeaders, null, 2)}`,
+                    corsHeaders['Access-Control-Allow-Origin'] ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult(quickResultDiv, 
+                    `❌ Cannot check headers - CORS blocked\n\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testPreflight() {
+            const url = getBackendUrl();
+            if (!url) {
+                showResult(quickResultDiv, '❌ Please enter backend URL', 'error');
+                return;
+            }
+
+            showLoading(quickResultDiv, 'Testing OPTIONS preflight...');
+
+            try {
+                const response = await fetch(`${url}/api/timer-status/1`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET',
+                        'Access-Control-Request-Headers': 'bypass-tunnel-reminder'
+                    }
+                });
+
+                if (response.ok) {
+                    showResult(quickResultDiv, 
+                        `✅ Preflight OK!\n\nStatus: ${response.status}`,
+                        'success'
+                    );
+                } else {
+                    showResult(quickResultDiv, 
+                        `⚠️ Preflight returned: ${response.status}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult(quickResultDiv, 
+                    `❌ Preflight failed\n\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        function testFromLocalStorage() {
+            const storedUrl = localStorage.getItem('backendUrl');
+            
+            if (!storedUrl) {
+                showResult(quickResultDiv, 
+                    `⚠️ No backend URL in localStorage\n\n` +
+                    `This is normal if you haven't deployed yet.`,
+                    'info'
+                );
+                return;
+            }
+
+            document.getElementById('backendUrl').value = storedUrl;
+            showResult(quickResultDiv, 
+                `✅ Found stored URL:\n\n${storedUrl}\n\n` +
+                `Now click "Test Timer Status" to test it.`,
+                'success'
+            );
+        }
+
+        // Auto-load from localStorage on page load
+        window.addEventListener('load', () => {
+            const storedUrl = localStorage.getItem('backendUrl');
+            if (storedUrl) {
+                document.getElementById('backendUrl').value = storedUrl;
+            }
+        });
+    </script>
+</body>
+</html>

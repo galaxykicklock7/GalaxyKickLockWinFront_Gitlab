@@ -41,10 +41,10 @@ body,
 /* --- LAYOUT GRID --- */
 .premium-layout {
     display: grid;
-    grid-template-rows: 50px 60px 1fr 180px 30px;
+    grid-template-rows: 40px 50px 1fr 160px 25px;
     height: 100vh;
-    gap: 10px;
-    padding: 10px;
+    gap: 8px;
+    padding: 8px;
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -55,9 +55,9 @@ body,
     align-items: center;
     justify-content: center;
     font-family: 'Orbitron', sans-serif;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 900;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
     color: #fff;
     text-shadow: 
         0 0 10px rgba(0, 243, 255, 0.8),
@@ -93,8 +93,8 @@ body,
     border: 1px solid rgba(0, 243, 255, 0.3);
     box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
     border-radius: 4px;
-    padding: 0 20px;
-    height: 60px;
+    padding: 0 15px;
+    height: 50px;
     position: relative;
 }
 
@@ -103,21 +103,21 @@ body,
 /* ACTIONS (Left) */
 .action-cluster {
     display: flex;
-    gap: 15px;
+    gap: 10px;
     position: relative;
 }
 
 .hex-btn {
     font-family: 'Orbitron', sans-serif;
     font-weight: 700;
-    font-size: 12px;
-    padding: 0 20px;
-    height: 35px;
+    font-size: 11px;
+    padding: 0 15px;
+    height: 30px;
     border: 1px solid;
     border-radius: 3px;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
@@ -227,8 +227,8 @@ body,
     align-items: center;
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(0, 243, 255, 0.3);
-    padding: 5px 10px;
-    gap: 10px;
+    padding: 4px 8px;
+    gap: 4px;
     border-radius: 3px;
     transition: all 0.3s ease;
 }
@@ -250,13 +250,13 @@ body,
     border: none;
     color: #fff;
     font-family: 'Rajdhani', sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    padding: 5px 10px;
-    width: 300px;
+    padding: 4px 8px;
+    width: 250px;
     outline: none;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 .nav-input::placeholder {
@@ -268,15 +268,15 @@ body,
     color: #fff;
     font-family: 'Orbitron', sans-serif;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11px;
     border: 1px solid var(--neon-blue);
-    height: 30px;
-    padding: 0 15px;
+    height: 26px;
+    padding: 0 12px;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     border-radius: 3px;
 }
 
@@ -289,25 +289,25 @@ body,
 .system-status {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
 
 .device-selector {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     background: rgba(0, 0, 0, 0.5);
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 3px;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .dev-icon {
-    font-size: 24px;
+    font-size: 20px;
     color: #fff;
     transition: all 0.3s;
     cursor: pointer;
-    padding: 3px;
+    padding: 2px;
 }
 
 .dev-icon:hover {
@@ -329,17 +329,17 @@ body,
     background: rgba(255, 0, 60, 0.2);
     border: 1px solid var(--neon-red);
     color: var(--neon-red);
-    padding: 6px 12px;
+    padding: 5px 10px;
     font-family: 'Rajdhani', sans-serif;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 11px;
     letter-spacing: 0.5px;
     cursor: pointer;
     transition: all 0.2s;
     border-radius: 3px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
 }
 
 .logout-btn-mini:hover {
@@ -375,7 +375,7 @@ body,
     box-shadow: 0 0 10px rgba(0, 243, 255, 0.05);
     display: flex;
     flex-direction: column;
-    height: 100%;
+    max-height: 100%;
     position: relative;
     border-radius: 4px;
     overflow: hidden;
@@ -384,46 +384,59 @@ body,
 .panel-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 15px;
+    gap: 6px;
+    padding: 8px 12px;
     background: rgba(0, 243, 255, 0.03);
     border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+    flex-shrink: 0;
 }
 
 .panel-icon {
-    font-size: 14px;
+    font-size: 12px;
     color: var(--neon-cyan);
 }
 
 .panel-title {
     font-family: 'Orbitron', sans-serif;
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 /* COLUMN 1: NEURAL LINK */
+.neural-link {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
 .neural-grid {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: 5px;
-    height: 100%;
-    overflow: hidden;
+    gap: 4px;
+    padding: 4px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .code-card {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(0, 243, 255, 0.25);
-    border-left: 3px solid rgba(0, 243, 255, 0.3);
-    padding: 3px;
+    border-left: 2px solid rgba(0, 243, 255, 0.3);
+    padding: 2px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     transition: all 0.3s;
     border-radius: 3px;
-    flex: 1;
+    flex: 0 0 auto;
+    min-height: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .code-card:focus-within,
@@ -434,8 +447,8 @@ body,
 }
 
 .status-led {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: #222;
     border: 2px solid #444;
@@ -472,6 +485,7 @@ body,
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 2px;
+    width: 100%;
 }
 
 .hud-input {
@@ -480,13 +494,15 @@ body,
     color: #fff;
     font-family: 'Rajdhani', sans-serif;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     padding: 0px;
     text-align: center;
     transition: all 0.2s;
     border-radius: 2px;
-    height: 20px;
+    height: 18px;
     box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 .hud-input:disabled {
@@ -510,33 +526,34 @@ body,
 
 /* COLUMN 2: CORE SYSTEMS */
 .core-systems-content {
-    padding: 5px;
+    padding: 4px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto auto auto;
-    gap: 4px;
-    height: 100%;
-    overflow: hidden;
+    gap: 3px;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .control-section {
     background: rgba(0, 0, 0, 0.4);
-    padding: 4px;
+    padding: 3px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    border-radius: 3px;
     box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 .section-label {
     display: block;
     font-family: 'Orbitron';
-    font-size: 11px;
+    font-size: 10px;
     color: #fff;
     font-weight: 700;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
     letter-spacing: 0.5px;
     text-align: center;
-    padding-bottom: 3px;
+    padding-bottom: 2px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -544,26 +561,26 @@ body,
 .switch-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .rocker-switch {
     display: flex;
     background: #000;
     border: 2px solid #333;
-    border-radius: 30px;
+    border-radius: 25px;
     padding: 2px;
     flex: 1;
-    height: 30px;
+    height: 26px;
 }
 
 .switch-option {
     flex: 1;
     text-align: center;
     padding: 2px;
-    border-radius: 15px;
+    border-radius: 12px;
     font-family: 'Orbitron';
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #fff;
     cursor: pointer;
@@ -571,8 +588,8 @@ body,
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    height: 24px;
+    gap: 2px;
+    height: 20px;
 }
 
 .switch-option.active {
@@ -593,6 +610,13 @@ body,
     gap: 3px;
 }
 
+/* Two items in Defense Matrix (AUTO RELEASE, SMART MODE) */
+.matrix-grid-two {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3px;
+}
+
 /* Reduce to 3 items in Defense Matrix since AUTO INT moved */
 .matrix-grid-three {
     display: grid;
@@ -606,7 +630,7 @@ body,
     color: #fff;
     padding: 2px;
     font-family: 'Orbitron';
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
@@ -615,7 +639,7 @@ body,
     justify-content: center;
     gap: 2px;
     border-radius: 3px;
-    height: 24px;
+    height: 22px;
 }
 
 .cyber-toggle:hover {
@@ -628,6 +652,19 @@ body,
     border-color: var(--neon-cyan);
     color: var(--neon-cyan);
     box-shadow: 0 0 12px rgba(0, 243, 255, 0.2);
+}
+
+.cyber-toggle.disabled {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: #222;
+    color: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.cyber-toggle.disabled:hover {
+    border-color: #222;
+    color: #666;
 }
 
 /* Kick Protocols */
@@ -651,15 +688,15 @@ body,
     background: rgba(0, 0, 0, 0.7);
     border: 1px solid #444;
     color: #fff;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     font-family: 'Orbitron';
-    padding: 3px 2px;
+    padding: 2px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
     border-radius: 3px;
-    height: 26px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -738,6 +775,65 @@ body,
     text-shadow: 0 0 10px var(--neon-purple);
 }
 
+/* AI Core Wrapper (AI Core button + Speed Buttons stacked) */
+.ai-core-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+/* Speed Preset Buttons */
+.speed-preset-row {
+    display: flex;
+    gap: 2px;
+}
+
+.speed-btn {
+    flex: 1;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron';
+    font-size: 8px;
+    letter-spacing: 0.5px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0 2px;
+    min-width: 0;
+}
+
+.speed-btn:hover {
+    border-color: #666;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.speed-btn.active.slow {
+    border-color: #00aaff;
+    color: #fff;
+    background: rgba(0, 170, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 170, 255, 0.2);
+}
+
+.speed-btn.active.normal {
+    border-color: #00ff88;
+    color: #fff;
+    background: rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.speed-btn.active.fast {
+    border-color: #ff003c;
+    color: #fff;
+    background: rgba(255, 0, 60, 0.3);
+    box-shadow: 0 0 10px rgba(255, 0, 60, 0.2);
+}
+
 /* Tuning Inputs */
 .tuning-grid {
     display: flex;
@@ -753,17 +849,25 @@ body,
 }
 
 .tiny-input {
-    width: 50px;
+    width: 45px;
     background: rgba(0, 0, 0, 0.8);
     border: 1px solid #444;
     color: #fff;
     padding: 2px;
     text-align: center;
     font-family: 'Rajdhani';
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     border-radius: 3px;
-    height: 24px;
+    height: 22px;
+}
+
+.tiny-input:disabled {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #222;
+    color: #666;
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .tiny-input:focus {
@@ -775,19 +879,19 @@ body,
 /* COLUMN 3: SECURITY DATABASE */
 .security-tabs {
     background: rgba(0, 0, 0, 0.3);
-    padding: 0 15px;
+    padding: 0 10px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     border-bottom: 1px solid rgba(0, 243, 255, 0.2);
 }
 
 .sec-tab {
-    padding: 10px 0;
-    font-size: 11px;
+    padding: 8px 0;
+    font-size: 10px;
     font-weight: 700;
     font-family: 'Orbitron';
-    margin-right: 15px;
-    letter-spacing: 1px;
+    margin-right: 12px;
+    letter-spacing: 0.5px;
     opacity: 0.5;
     background: transparent;
     border: none;
@@ -818,18 +922,221 @@ body,
 }
 
 .security-content {
-    padding: 15px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    height: calc(100% - 50px);
+    gap: 6px;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
 }
 
+/* Horizontal Layout */
+.list-container-horizontal {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.list-full {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    height: 100%;
+}
+
+.section-header-with-tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    height: 22px;
+    gap: 10px;
+}
+
+.section-label-left {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #00f3ff;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+/* Horizontal Tabs (Next to Label) */
+.list-tabs-horizontal {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.list-type-tab-horizontal {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 243, 255, 0.4);
+    color: #8baebd;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.list-type-tab-horizontal:hover {
+    border-color: rgba(0, 243, 255, 0.7);
+    color: #00f3ff;
+    background: rgba(0, 243, 255, 0.1);
+}
+
+.list-type-tab-horizontal.active {
+    background: rgba(0, 243, 255, 0.2);
+    border-color: #00f3ff;
+    color: #00f3ff;
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+}
+
+/* Large Textarea - Fill Available Space */
+.db-textarea-large {
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    color: #fff;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 8px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    resize: none;
+    border-radius: 3px;
+    transition: all 0.3s;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.db-textarea-large::placeholder {
+    color: #555 !important;
+}
+
+.db-textarea-large:focus {
+    border-color: #00f3ff;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+    background: rgba(0, 0, 0, 0.95);
+    outline: none;
+}
+
+/* Custom Scrollbar */
+.db-textarea-large::-webkit-scrollbar {
+    width: 5px;
+}
+
+.db-textarea-large::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.db-textarea-large::-webkit-scrollbar-thumb {
+    background: rgba(0, 243, 255, 0.3);
+    border-radius: 3px;
+}
+
+.db-textarea-large::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 243, 255, 0.5);
+}
+
+/* Old styles - keep for backward compatibility */
 .list-container {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+    flex-shrink: 0;
+}
+
+.section-header-centered {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 3px;
+    flex-shrink: 0;
+}
+
+.section-label-centered {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #00f3ff;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.list-type-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.list-type-tabs-centered {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+}
+
+.list-type-tab {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    color: #8baebd;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.list-type-tab:hover {
+    border-color: rgba(0, 243, 255, 0.6);
+    color: #00f3ff;
+}
+
+.list-type-tab.active {
+    background: rgba(0, 243, 255, 0.15);
+    border-color: #00f3ff;
+    color: #00f3ff;
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+}
+
+.list-hint {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    color: #8baebd;
+    text-align: center;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 3px;
+    border: 1px solid rgba(0, 243, 255, 0.1);
 }
 
 .db-textarea {
@@ -837,14 +1144,16 @@ body,
     border: 1px solid #333;
     color: #fff;
     font-family: 'Consolas', monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    padding: 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 6px;
     width: 100%;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     resize: none;
     border-radius: 3px;
     transition: all 0.3s;
+    overflow-y: auto;
 }
 
 .db-textarea::placeholder {
@@ -860,10 +1169,12 @@ body,
 
 /* --- 3. FOOTER: DATA STREAMS --- */
 .data-streams {
-    height: 180px;
+    height: 160px;
+    max-height: 160px;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
+    gap: 8px;
+    overflow: hidden;
 }
 
 .stream-terminal {
@@ -874,6 +1185,7 @@ body,
     display: flex;
     flex-direction: column;
     box-shadow: 0 0 10px rgba(0, 243, 255, 0.05);
+    max-height: 100%;
 }
 
 .stream-header {
@@ -883,21 +1195,24 @@ body,
     font-family: 'Orbitron';
     font-weight: 600;
     letter-spacing: 0.5px;
-    padding: 6px 10px;
+    padding: 5px 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 9px;
+    flex-shrink: 0;
 }
 
 .stream-content {
-    font-size: 10px;
-    line-height: 1.4;
+    font-size: 9px;
+    line-height: 1.3;
     color: #fff;
-    padding: 8px;
+    padding: 6px;
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
     font-family: 'Courier New', monospace;
+    max-height: calc(160px - 26px);
 }
 
 .stream-content::-webkit-scrollbar {
