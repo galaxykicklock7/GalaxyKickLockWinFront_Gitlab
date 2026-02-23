@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const { appState, addLog } = require("./src/config/appState");
 const { initializeConnectionPool, getCurrentCode } = require("./src/network/connectionManager");
 const { createWebSocketConnection } = require("./src/network/socketManager");
+const fileLogger = require("./src/utils/fileLogger");
 
 // Polyfill for Headers API (required for Supabase in older Node.js versions)
 if (typeof global.Headers === 'undefined') {
@@ -90,22 +91,21 @@ console.log(`Starting G.O.A.T Backend Server on port ${API_PORT}`);
 const apiServer = express();
 apiServer.use(bodyParser.json());
 
+// Fix #4: hoist outside middleware — one allocation at startup, not per-request
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'https://galaxykicklock2.vercel.app',
+  'https://galaxykicklock2-galaxykicklocks-projects.vercel.app',
+  'https://galaxykicklock2-galaxykicklock77-galaxykicklocks-projects.vercel.app',
+  'https://galaxykicklock2g.vercel.app'
+];
+
 // CORS Configuration
 apiServer.use((req, res, next) => {
-  // SECURITY: Strict whitelist - only specific domains allowed
-  const allowedOrigins = [
-    // Local development
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-    
-    // Production frontend (Vercel)
-    'https://galaxykicklock2.vercel.app',
-    'https://galaxykicklock2-galaxykicklocks-projects.vercel.app',
-    'https://galaxykicklock2-galaxykicklock77-galaxykicklocks-projects.vercel.app',
-    'https://galaxykicklock2g.vercel.app'
-  ];
+  const allowedOrigins = ALLOWED_ORIGINS;
   
   const origin = req.headers.origin;
   let isAllowed = false;
@@ -292,8 +292,10 @@ apiServer.post('/api/configure', (req, res) => {
       });
     }
 
-    // SECURITY: Log sanitized config (redact sensitive fields)
-    console.log('[API] /api/configure received:', JSON.stringify(sanitizeConfig(config), null, 2));
+    // Fix #3: skip expensive JSON.stringify on every configure call; only log in debug mode
+    if (process.env.DEBUG === 'true') {
+      console.log('[API] /api/configure received:', JSON.stringify(sanitizeConfig(config), null, 2));
+    }
 
     // Update sensitive config keys (recovery codes)
     if (config.rc1 !== undefined) appState.config.rc1 = config.rc1;
@@ -1416,18 +1418,16 @@ apiServer.listen(API_PORT, () => {
   console.log(`========================================\n`);
 });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
+// Graceful shutdown — Fix #6: flush + stop fileLogger timer before exit
+function gracefulShutdown() {
   console.log('\n🛑 Shutting down gracefully...');
+  try { fileLogger.destroy(); } catch (e) { /* ignore if not imported */ }
   disconnectAll();
   process.exit(0);
-});
+}
 
-process.on('SIGTERM', () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  disconnectAll();
-  process.exit(0);
-});
+process.on('SIGINT',  gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
 
 // Keep process alive
 setInterval(() => {}, 1000);
