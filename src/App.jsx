@@ -583,18 +583,17 @@ function UserApp() {
       // If AI Core was restored from localStorage, re-send enable commands to backend
       if (aiCoreEnabled) {
         try {
-          const { getBackendUrl } = await import('./utils/backendUrl');
           const { tunnelManager } = await import('./utils/tunnelManager');
+          const { getBackendUrl } = await import('./utils/backendUrl');
 
-          // ✅ Try tunnel manager first for intelligent routing
-          let backendUrl = null;
-          const healthyTunnel = tunnelManager.getHealthyTunnel();
-          if (healthyTunnel) {
-            backendUrl = healthyTunnel.url;
-          } else {
-            // Fallback to main backend URL
-            backendUrl = getBackendUrl();
+          // ✅ Ensure tunnels loaded before checking
+          if (tunnelManager.tunnels.length === 0) {
+            tunnelStorage.initializeTunnelManager();
           }
+          const healthyTunnel = tunnelManager.getHealthyTunnel();
+          const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
+
+          console.log(`🤖 AI Core re-enable (on connect) via: ${backendUrl}`);
 
           if (backendUrl) {
             const aiPromises = [];
@@ -699,27 +698,36 @@ function UserApp() {
     setAiCoreEnabled(newState);
     
     try {
+      const { tunnelManager } = await import('./utils/tunnelManager');
       const { getBackendUrl } = await import('./utils/backendUrl');
-      const backendUrl = getBackendUrl();
-      
+
+      // ✅ Always prefer a healthy tunnel over the raw main URL
+      if (tunnelManager.tunnels.length === 0) {
+        tunnelStorage.initializeTunnelManager();
+      }
+      const healthyTunnel = tunnelManager.getHealthyTunnel();
+      const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
+
+      console.log(`🤖 AI Core toggle via: ${backendUrl}`);
+
       if (!backendUrl) {
         showToast('Backend not connected', 'error');
         setAiCoreEnabled(!newState); // Revert on error
         setAiCoreLoading(false);
         return;
       }
-      
+
       const action = newState ? 'enable' : 'disable';
-      
+
       // Only enable/disable AI for ACTIVE connections (those with recovery codes)
       const promises = [];
       const activeConnections = [];
-      
+
       for (let i = 1; i <= 5; i++) {
         // Check if this connection has a recovery code configured
         const hasRC = config[`rc${i}`] && config[`rc${i}`].trim() !== '';
         const hasRCL = config[`rcl${i}`] && config[`rcl${i}`].trim() !== '';
-        
+
         if (hasRC || hasRCL) {
           activeConnections.push(i);
           promises.push(
