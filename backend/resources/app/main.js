@@ -1,4 +1,3 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -6,7 +5,7 @@ const { appState, addLog } = require("./src/config/appState");
 const { initializeConnectionPool, getCurrentCode } = require("./src/network/connectionManager");
 const { createWebSocketConnection } = require("./src/network/socketManager");
 
-// Polyfill for Headers API (required for Supabase in older Node.js/Electron versions)
+// Polyfill for Headers API (required for Supabase in older Node.js versions)
 if (typeof global.Headers === 'undefined') {
   global.Headers = class Headers {
     constructor(init) {
@@ -61,7 +60,7 @@ if (typeof global.Headers === 'undefined') {
   };
 }
 
-// Polyfill for fetch API (required for Supabase in older Node.js/Electron versions)
+// Polyfill for fetch API (required for Supabase in older Node.js versions)
 if (!globalThis.fetch) {
   const nodeFetch = require('node-fetch');
   globalThis.fetch = nodeFetch;
@@ -82,14 +81,10 @@ const supabase = createClient(
 
 console.log('[SUPABASE] Connected to Supabase for metrics tracking');
 
-// Headless mode support
-const HEADLESS_MODE = process.env.HEADLESS === "true" || process.argv.includes("--headless");
+// Configuration
 const API_PORT = process.env.API_PORT || 3000;
 
-console.log(`Starting G.O.A.T in ${HEADLESS_MODE ? 'HEADLESS' : 'GUI'} mode`);
-console.log(`API server will run on port ${API_PORT}`);
-
-let mainWindow;
+console.log(`Starting G.O.A.T Backend Server on port ${API_PORT}`);
 
 // Express Server Setup
 const apiServer = express();
@@ -121,36 +116,37 @@ apiServer.use((req, res, next) => {
   }
   // SECURITY: Only allow exact matches from whitelist
   else if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
     isAllowed = true;
   }
   // SECURITY: Allow ONLY the user's specific loca.lt subdomain (set via env var)
   else if (process.env.TUNNEL_SUBDOMAIN) {
     const allowedTunnelUrl = `https://${process.env.TUNNEL_SUBDOMAIN}.loca.lt`;
     if (origin === allowedTunnelUrl) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
       isAllowed = true;
     }
   }
   // SECURITY: Allow any loca.lt subdomain for flexibility
-  else if (origin.match(/^https:\/\/[\w-]+\.loca\.lt$/)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  else if (origin && origin.match(/^https:\/\/[\w-]+\.loca\.lt$/)) {
+    isAllowed = true;
+  }
+  // SECURITY: Allow any Vercel deployment URL for flexibility
+  else if (origin && origin.match(/^https:\/\/.*\.vercel\.app$/)) {
     isAllowed = true;
   }
   
   // Set CORS headers for allowed origins
   if (isAllowed) {
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 
-        'Content-Type, Authorization, X-API-Key, ' +
-        'bypass-tunnel-reminder, cache-control, pragma, expires, ' +
-        'x-requested-with, accept, origin, referer, user-agent, ' +
-        'x-user-id'
-      );
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
-    }
+    // Always set CORS headers for allowed origins
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 
+      'Content-Type, Authorization, X-API-Key, ' +
+      'bypass-tunnel-reminder, cache-control, pragma, expires, ' +
+      'x-requested-with, accept, origin, referer, user-agent, ' +
+      'x-user-id'
+    );
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -161,7 +157,15 @@ apiServer.use((req, res, next) => {
   } else {
     // SECURITY: Reject unknown origins
     console.log(`⚠️ CORS blocked: ${origin}`);
-    return res.status(403).json({ error: 'Access denied' });
+    console.log(`   Allowed: ${allowedOrigins.join(', ')}`);
+    console.log(`   Vercel pattern test: ${origin && origin.match(/^https:\/\/.*\.vercel\.app$/) ? 'MATCHES' : 'NO MATCH'}`);
+    console.log(`   Loca.lt pattern test: ${origin && origin.match(/^https:\/\/[\w-]+\.loca\.lt$/) ? 'MATCHES' : 'NO MATCH'}`);
+
+    // Still set basic CORS headers for error responses
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    return res.status(403).json({ error: 'Access denied', receivedOrigin: origin });
   }
 });
 
@@ -331,6 +335,18 @@ apiServer.post('/api/configure', (req, res) => {
       dadplus: appState.config.dadplus,
       kickrc: appState.config.kickrc ? '***REDACTED***' : '(empty)'
     });
+
+    // Reset auto interval starting values when user changes timing from UI
+    const timingKeys = ['attack1','attack2','attack3','attack4','attack5','waiting1','waiting2','waiting3','waiting4','waiting5'];
+    const hasTimingChange = timingKeys.some(k => config[k] !== undefined);
+    if (hasTimingChange || config.timershift !== undefined) {
+      // Reset stored starting values so auto interval picks up new base
+      Object.values(appState.gameLogic).forEach(logic => {
+        if (logic && logic.autoIntervalStartValues) {
+          logic.autoIntervalStartValues = {};
+        }
+      });
+    }
 
     // Re-initialize pool
     initializeConnectionPool();
@@ -682,7 +698,12 @@ apiServer.post('/api/metrics/imprison', async (req, res) => {
       codeUsed,         // 'primary' or 'alt'
       isClanMember,     // true/false
       isSuccess,        // true for success, false for 3s error
-      username          // Logged-in user's username/email
+      timingValue,      // Actual timing value used (ms)
+      timingType,       // 'attack' or 'defense'
+      pingMs,           // Ping in milliseconds (optional)
+      context,          // Server context: 'FAST', 'NORMAL', 'SLOW' (optional)
+      adjustmentReason, // What caused this timing: '3S_ERROR', 'SUCCESS', 'FAILURE', 'STUCK_ESCAPE', 'INIT', 'DB_INIT' (optional)
+      isDefense = false // NEW: Defense flag (default false for backward compatibility)
     } = req.body;
 
     // Validation
@@ -694,9 +715,11 @@ apiServer.post('/api/metrics/imprison', async (req, res) => {
     }
 
     const resultType = isSuccess !== false ? 'SUCCESS' : '3S ERROR';
-    console.log(`[METRICS] Recording ${resultType}: user=${userId}, conn=${connectionNumber}, player=${playerName}, code=${codeUsed}, clan=${isClanMember}, time=${timestampMs}ms, username=${username}`);
+    const defenseInfo = isDefense ? ' [DEFENSE]' : '';
+    const reasonInfo = adjustmentReason ? `, reason=${adjustmentReason}` : '';
+    console.log(`[METRICS] Recording ${resultType}${defenseInfo}: user=${userId}, conn=${connectionNumber}, player=${playerName}, code=${codeUsed}, clan=${isClanMember}, time=${timestampMs}ms, timing=${timingValue}ms ${timingType}, ping=${pingMs}ms, context=${context}${reasonInfo}`);
 
-    // Call Supabase function
+    // Call Supabase function (match EXACT function signature with all parameters)
     const { data, error } = await supabase.rpc('record_imprisonment_metric', {
       p_user_id: userId,
       p_connection_number: connectionNumber,
@@ -705,7 +728,13 @@ apiServer.post('/api/metrics/imprison', async (req, res) => {
       p_code_used: codeUsed,
       p_is_clan_member: isClanMember || false,
       p_is_success: isSuccess !== false,  // Default to true if not specified
-      p_username: username || null
+      p_username: null,                   // ✅ Added missing parameter
+      p_timing_value: timingValue || null,  // Pass timing value
+      p_timing_type: timingType || null,    // Pass timing type
+      p_ping_ms: pingMs || null,            // Pass ping
+      p_context: context || null,           // Pass context
+      p_adjustment_reason: adjustmentReason || null,  // Pass adjustment reason
+      p_is_defense: isDefense || false      // Pass defense flag
     });
 
     if (error) {
@@ -716,7 +745,8 @@ apiServer.post('/api/metrics/imprison', async (req, res) => {
       });
     }
 
-    console.log(`[METRICS] Successfully recorded ${resultType} for ${playerName}`);
+    console.log(`[METRICS] Successfully recorded ${resultType}${defenseInfo} for ${playerName}${reasonInfo}`);
+    
     res.json(data);
 
   } catch (error) {
@@ -724,6 +754,106 @@ apiServer.post('/api/metrics/imprison', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to record metric' 
+    });
+  }
+});
+
+// POST /api/metrics/defense - Record defense metric (when rival kicks you)
+apiServer.post('/api/metrics/defense', async (req, res) => {
+  try {
+    const {
+      userId,
+      connectionNumber,
+      timestampMs,
+      rivalName,
+      rivalTiming,        // How fast rival kicked you
+      yourTiming,         // Your timing at that moment
+      yourPingMs,
+      yourContext
+    } = req.body;
+    
+    // Validation
+    if (!userId || !connectionNumber || timestampMs === undefined || !rivalName || !rivalTiming) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+    
+    console.log(`[DEFENSE] Recording rival kick: user=${userId}, conn=${connectionNumber}, rival=${rivalName}, rivalTiming=${rivalTiming}ms, yourTiming=${yourTiming}ms, ping=${yourPingMs}ms, context=${yourContext}`);
+    
+    // Call Supabase function
+    const { data, error } = await supabase.rpc('record_defense_metric', {
+      p_user_id: userId,
+      p_connection_number: connectionNumber,
+      p_timestamp_ms: timestampMs,
+      p_rival_name: rivalName,
+      p_rival_timing: rivalTiming,
+      p_your_timing: yourTiming || null,
+      p_ping_ms: yourPingMs || null,
+      p_context: yourContext || null
+    });
+    
+    if (error) {
+      console.error('[DEFENSE] Supabase error recording defense metric:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to record defense metric'
+      });
+    }
+    
+    console.log(`[DEFENSE] Successfully recorded: ${rivalName} kicked you at ~${rivalTiming}ms`);
+    
+    res.json({ success: true, data });
+    
+  } catch (error) {
+    console.error('[DEFENSE] Error recording defense metric:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record defense metric'
+    });
+  }
+});
+
+// GET /api/metrics/defense/:userId - Get defense statistics
+apiServer.get('/api/metrics/defense/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { context, limit } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID required'
+      });
+    }
+    
+    console.log(`[DEFENSE] Fetching defense stats: user=${userId}, context=${context || 'ALL'}, limit=${limit || 100}`);
+    
+    // Call Supabase function
+    const { data, error } = await supabase.rpc('get_defense_stats', {
+      p_user_id: userId,
+      p_context: context || null,
+      p_limit: parseInt(limit) || 100
+    });
+    
+    if (error) {
+      console.error('[DEFENSE] Supabase error fetching defense stats:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch defense stats'
+      });
+    }
+    
+    console.log(`[DEFENSE] Defense stats:`, data);
+    
+    res.json({ success: true, data: data[0] || null });
+    
+  } catch (error) {
+    console.error('[DEFENSE] Error fetching defense stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch defense stats'
     });
   }
 });
@@ -783,121 +913,430 @@ apiServer.get('/api/metrics/:connectionNumber', async (req, res) => {
   }
 });
 
-// POST /api/metrics/cleanup - Cleanup metrics for a username
-apiServer.post('/api/metrics/cleanup', async (req, res) => {
+// GET /api/timer-status/:wsNumber - Get timer status for auto interval indicator
+apiServer.get('/api/timer-status/:wsNumber', (req, res) => {
   try {
-    const { username } = req.body;
+    const wsNumber = parseInt(req.params.wsNumber);
     
-    if (!username) {
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Username required' 
+        error: 'Invalid wsNumber' 
       });
     }
-
-    console.log(`[METRICS] Cleaning up metrics for username: ${username}`);
-
-    // Call Supabase cleanup function
-    const { data, error } = await supabase.rpc('cleanup_user_metrics', {
-      p_username: username
-    });
-
-    if (error) {
-      console.error('[METRICS] Supabase error cleaning up metrics:', error);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to cleanup metrics' 
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (logic && logic.timerStatus) {
+      res.json({
+        success: true,
+        state: logic.timerStatus.state,
+        lastUpdate: logic.timerStatus.lastUpdate
+      });
+    } else {
+      res.json({ 
+        success: true,
+        state: 'unknown',
+        lastUpdate: Date.now()
       });
     }
-
-    console.log(`[METRICS] Cleanup result:`, data);
-    res.json(data);
-
   } catch (error) {
-    console.error('[METRICS] Error cleaning up metrics:', error);
+    console.error('[API] Error getting timer status:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to cleanup metrics' 
+      error: 'Failed to get timer status' 
     });
   }
 });
 
-// Auto-cleanup timer: Clean up metrics every 3 minutes for active users
-const activeUsers = new Set(); // Track active usernames
-let cleanupInterval = null;
-
-// Start auto-cleanup
-function startAutoCleanup() {
-  if (cleanupInterval) return; // Already running
-  
-  cleanupInterval = setInterval(async () => {
-    if (activeUsers.size === 0) return;
+// GET /api/check-stuck-at-max/:wsNumber - Check if stuck at max timing from database
+apiServer.get('/api/check-stuck-at-max/:wsNumber', async (req, res) => {
+  try {
+    const wsNumber = parseInt(req.params.wsNumber);
     
-    console.log(`[METRICS] Auto-cleanup: Processing ${activeUsers.size} active user(s)`);
-    
-    for (const username of activeUsers) {
-      try {
-        const { data, error } = await supabase.rpc('cleanup_user_metrics', {
-          p_username: username
-        });
-        
-        if (error) {
-          console.error(`[METRICS] Auto-cleanup error for ${username}:`, error);
-        } else {
-          console.log(`[METRICS] Auto-cleanup: Deleted ${data.deleted} metrics for ${username}`);
-        }
-      } catch (err) {
-        console.error(`[METRICS] Auto-cleanup exception for ${username}:`, err);
-      }
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
     }
-  }, 3 * 60 * 1000); // 3 minutes
-  
-  console.log('[METRICS] Auto-cleanup started (every 3 minutes)');
-}
-
-// Register user for auto-cleanup
-apiServer.post('/api/metrics/register', (req, res) => {
-  const { username } = req.body;
-  
-  if (!username) {
-    return res.status(400).json({ 
+    
+    // Get userId from header
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Unauthorized - User ID required' 
+      });
+    }
+    
+    // Get current config to get max values
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    if (!logic || !logic.config) {
+      return res.json({ 
+        success: true,
+        stuckAtMax: false,
+        reason: 'No active connection'
+      });
+    }
+    
+    const maxAttack = parseInt(logic.config.maxatk || 3000);
+    const maxDefense = parseInt(logic.config.maxdef || 3000);
+    
+    // Call Supabase function to check database
+    const { data, error } = await supabase.rpc('check_stuck_at_max', {
+      p_user_id: userId,
+      p_connection_number: wsNumber,
+      p_max_attack: maxAttack,
+      p_max_defense: maxDefense
+    });
+    
+    if (error) {
+      console.error('[API] Supabase error checking stuck at max:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to check stuck status' 
+      });
+    }
+    
+    res.json(data);
+    
+  } catch (error) {
+    console.error('[API] Error checking stuck at max:', error);
+    res.status(500).json({ 
       success: false, 
-      error: 'Username required' 
+      error: 'Failed to check stuck status' 
     });
   }
-  
-  activeUsers.add(username);
-  console.log(`[METRICS] Registered user for auto-cleanup: ${username} (${activeUsers.size} total)`);
-  
-  // Start cleanup timer if not already running
-  startAutoCleanup();
-  
-  res.json({ 
-    success: true, 
-    message: 'User registered for auto-cleanup',
-    username: username
-  });
 });
 
-// Unregister user from auto-cleanup
-apiServer.post('/api/metrics/unregister', (req, res) => {
-  const { username } = req.body;
-  
-  if (!username) {
-    return res.status(400).json({ 
+// ==================== AI CORE API ENDPOINTS ====================
+
+// POST /api/ai/enable/:wsNumber - Enable AI for connection
+apiServer.post('/api/ai/enable/:wsNumber', async (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    const ws = appState.websockets[`ws${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    if (!ws || ws.readyState !== ws.OPEN) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not active' 
+      });
+    }
+    
+    // Check if already enabled
+    if (logic.aiEnabled) {
+      return res.json({ 
+        success: true, 
+        message: 'AI already enabled',
+        stats: logic.aiCore ? logic.aiCore.getStats() : null
+      });
+    }
+    
+    // Initialize AI
+    const supabaseUrl = 'https://gpjmbaxvfnfggkbxlaey.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdwam1iYXh2Zm5mZ2drYnhsYWV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODEzMjQ1OCwiZXhwIjoyMDgzNzA4NDU4fQ.0edK_ThNBzag3vWeG5jhW2ldsozQKtZkBwUL11ckfCY';
+    
+    console.log(`[API] Enabling AI for WS${wsNumber}...`);
+    const initialized = await logic.initializeAI(supabaseUrl, supabaseKey);
+    
+    if (initialized) {
+      console.log(`[API] ✅ AI enabled for WS${wsNumber}: aiEnabled=${logic.aiEnabled}, aiInitialized=${logic.aiInitialized}`);
+      addLog(wsNumber, `🧠 AI Core enabled`);
+      res.json({ 
+        success: true, 
+        message: 'AI enabled successfully',
+        stats: logic.aiCore.getStats()
+      });
+    } else {
+      console.log(`[API] ❌ AI initialization failed for WS${wsNumber}`);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to initialize AI' 
+      });
+    }
+    
+  } catch (error) {
+    console.error('[API] Error enabling AI:', error);
+    res.status(500).json({ 
       success: false, 
-      error: 'Username required' 
+      error: 'Failed to enable AI' 
     });
   }
-  
-  activeUsers.delete(username);
-  console.log(`[METRICS] Unregistered user from auto-cleanup: ${username} (${activeUsers.size} remaining)`);
-  
-  res.json({ 
-    success: true, 
-    message: 'User unregistered from auto-cleanup',
-    username: username
-  });
+});
+
+// POST /api/ai/disable/:wsNumber - Disable AI for connection
+apiServer.post('/api/ai/disable/:wsNumber', (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    // Disable AI
+    logic.aiEnabled = false;
+    
+    console.log(`[WS${wsNumber}] AI disabled`);
+    
+    res.json({ 
+      success: true, 
+      message: 'AI disabled successfully'
+    });
+    
+  } catch (error) {
+    console.error('[API] Error disabling AI:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to disable AI' 
+    });
+  }
+});
+
+// POST /api/ai/chat/enable/:wsNumber - Enable AI Chat for connection
+apiServer.post('/api/ai/chat/enable/:wsNumber', (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    // Enable AI Chat
+    logic.aiChatEnabled = true;
+    
+    console.log(`[WS${wsNumber}] AI Chat enabled`);
+    
+    res.json({ 
+      success: true, 
+      message: 'AI Chat enabled successfully',
+      aiChatEnabled: true
+    });
+    
+  } catch (error) {
+    console.error('[API] Error enabling AI Chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to enable AI Chat' 
+    });
+  }
+});
+
+// POST /api/ai/chat/disable/:wsNumber - Disable AI Chat for connection
+apiServer.post('/api/ai/chat/disable/:wsNumber', (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    // Disable AI Chat
+    logic.aiChatEnabled = false;
+    
+    console.log(`[WS${wsNumber}] AI Chat disabled`);
+    
+    res.json({ 
+      success: true, 
+      message: 'AI Chat disabled successfully',
+      aiChatEnabled: false
+    });
+    
+  } catch (error) {
+    console.error('[API] Error disabling AI Chat:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to disable AI Chat' 
+    });
+  }
+});
+
+// GET /api/ai/stats/:wsNumber - Get AI statistics
+apiServer.get('/api/ai/stats/:wsNumber', (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    if (!logic.aiEnabled || !logic.aiCore) {
+      return res.json({ 
+        success: true, 
+        enabled: false,
+        message: 'AI not enabled'
+      });
+    }
+    
+    const stats = logic.aiCore.getStats();
+    
+    res.json({ 
+      success: true, 
+      enabled: true,
+      stats: stats
+    });
+    
+  } catch (error) {
+    console.error('[API] Error getting AI stats:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get AI stats' 
+    });
+  }
+});
+
+// GET /api/ai/context/:wsNumber - Get current context
+apiServer.get('/api/ai/context/:wsNumber', (req, res) => {
+  try {
+    // Explicit CORS headers for loca.lt compatibility
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    
+    const wsNumber = parseInt(req.params.wsNumber);
+    
+    if (isNaN(wsNumber) || wsNumber < 1 || wsNumber > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid wsNumber' 
+      });
+    }
+    
+    const logic = appState.gameLogic[`logic${wsNumber}`];
+    
+    if (!logic) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Connection not initialized' 
+      });
+    }
+    
+    if (!logic.aiEnabled || !logic.aiCore) {
+      return res.json({ 
+        success: true, 
+        enabled: false,
+        message: 'AI not enabled'
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      enabled: true,
+      context: logic.aiCore.currentContext,
+      ping: logic.aiCore.currentPing,
+      timing: logic.aiCore.currentTiming
+    });
+    
+  } catch (error) {
+    console.error('[API] Error getting AI context:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get AI context' 
+    });
+  }
 });
 
 // ==================== GLOBAL ERROR HANDLERS ====================
@@ -969,56 +1408,26 @@ function disconnectAll() {
 
 // Start API Server
 apiServer.listen(API_PORT, () => {
-  console.log(`API Server running on http://localhost:${API_PORT}`);
-  console.log(`Available endpoints:`);
-  console.log(`  GET  /api/health      - Health check`);
-  console.log(`  GET  /api/status      - Get current status`);
-  console.log(`  GET  /api/logs        - Get all logs`);
-  console.log(`  POST /api/configure   - Update configuration`);
-  console.log(`  POST /api/connect     - Connect all WebSockets`);
-  console.log(`  POST /api/disconnect  - Disconnect all WebSockets`);
-  console.log(`  POST /api/send        - Send command to specific WebSocket`);
-  console.log(`  POST /api/fly         - Join/fly to a planet`);
-  console.log(`  POST /api/release     - Release all accounts from prison`);
-  console.log(`  POST /api/metrics/imprison - Record imprisonment metric`);
-  console.log(`  GET  /api/metrics/:connectionNumber - Get metrics for connection`);
+  console.log(`\n========================================`);
+  console.log(`🚀 G.O.A.T Backend Server Started`);
+  console.log(`========================================`);
+  console.log(`📡 API Server: http://localhost:${API_PORT}`);
+  console.log(`📊 Health Check: http://localhost:${API_PORT}/api/health`);
+  console.log(`========================================\n`);
 });
 
-// Electron Logic
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  disconnectAll();
+  process.exit(0);
+});
 
-  // Load any.html (legacy UI)
-  mainWindow.loadFile('any.html');
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  disconnectAll();
+  process.exit(0);
+});
 
-  mainWindow.on('closed', function () {
-    mainWindow = null;
-  });
-}
-
-if (!HEADLESS_MODE) {
-  app.on('ready', createWindow);
-
-  app.on('window-all-closed', function () {
-    if (process.platform !== 'darwin') {
-      disconnectAll();
-      app.quit();
-    }
-  });
-
-  app.on('activate', function () {
-    if (mainWindow === null) {
-      createWindow();
-    }
-  });
-} else {
-  // Keep alive in headless
-  setInterval(() => { }, 1000);
-}
+// Keep process alive
+setInterval(() => {}, 1000);

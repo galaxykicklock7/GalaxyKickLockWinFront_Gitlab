@@ -584,7 +584,18 @@ function UserApp() {
       if (aiCoreEnabled) {
         try {
           const { getBackendUrl } = await import('./utils/backendUrl');
-          const backendUrl = getBackendUrl();
+          const { tunnelManager } = await import('./utils/tunnelManager');
+
+          // ✅ Try tunnel manager first for intelligent routing
+          let backendUrl = null;
+          const healthyTunnel = tunnelManager.getHealthyTunnel();
+          if (healthyTunnel) {
+            backendUrl = healthyTunnel.url;
+          } else {
+            // Fallback to main backend URL
+            backendUrl = getBackendUrl();
+          }
+
           if (backendUrl) {
             const aiPromises = [];
             for (let i = 1; i <= 5; i++) {
@@ -594,14 +605,38 @@ function UserApp() {
                 aiPromises.push(
                   fetch(`${backendUrl}/api/ai/enable/${i}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' }
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'bypass-tunnel-reminder': 'true'
+                    },
+                    credentials: 'include'
                   })
+                    .then(response => {
+                      if (!response.ok) {
+                        tunnelManager.recordFailure(backendUrl, `HTTP ${response.status}`);
+                        console.warn(`⚠️ AI enable ${i}: HTTP ${response.status}`);
+                        // Don't throw, continue
+                        return null;
+                      }
+                      tunnelManager.recordSuccess(backendUrl, 100);
+                      return response;
+                    })
+                    .catch(error => {
+                      tunnelManager.recordFailure(backendUrl, error.message);
+                      console.warn(`⚠️ AI enable ${i} failed:`, error.message);
+                      return null;
+                    })
                 );
               }
             }
             if (aiPromises.length > 0) {
-              await Promise.all(aiPromises);
-              showToast(`🧠 AI CORE re-enabled for ${aiPromises.length} connection(s)`, 'success');
+              const results = await Promise.all(aiPromises);
+              const successful = results.filter(r => r !== null).length;
+              if (successful > 0) {
+                showToast(`🧠 AI CORE re-enabled for ${successful}/${aiPromises.length} connection(s)`, 'success');
+              } else {
+                showToast(`⚠️ Could not re-enable AI CORE (check backend CORS)`, 'warning');
+              }
             }
           }
         } catch (aiErr) {
