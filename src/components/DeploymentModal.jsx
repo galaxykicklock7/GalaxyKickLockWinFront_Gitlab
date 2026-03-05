@@ -86,7 +86,7 @@ const DeploymentModal = ({ isOpen, status, progress, onClose, isDeactivating = f
 
           {status === 'failed' && (
             <div className="deploy-error-details">
-              <p className="error-hint">Check your GitHub token permissions or try again.</p>
+              <p className="error-hint">System activation failed. Please try again.</p>
             </div>
           )}
         </div>

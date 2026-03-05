@@ -62,9 +62,12 @@ function UserApp() {
   
   // Use ref to track if we've already logged out to prevent spam
   const hasLoggedOutRef = useRef(false);
-  
+
   // Debounce timer for backend config updates
   const configUpdateTimerRef = useRef(null);
+
+  // Stable ref to latest config — used by beforeunload to avoid re-registering the listener
+  const configRef = useRef(null);
 
   // Load config from storage or use defaults
   const getInitialConfig = () => {
@@ -133,7 +136,10 @@ function UserApp() {
     };
   };
 
-  const [config, setConfig] = useState(getInitialConfig());
+  // Pass function reference (not call) — React only invokes it once on mount
+  const [config, setConfig] = useState(getInitialConfig);
+  // Keep ref in sync so event listeners can read latest config without stale closures
+  configRef.current = config;
   
   // AI CORE state
   const [aiCoreEnabled, setAiCoreEnabled] = useState(() => {
@@ -142,6 +148,12 @@ function UserApp() {
     return saved === 'true';
   });
   const [aiCoreLoading, setAiCoreLoading] = useState(false);
+
+  // Dashboard/logs enabled when deployed OR in local test mode
+  const [isDashboardEnabled, setIsDashboardEnabled] = useState(() => {
+    return storageManager.getItem('deploymentStatus') === 'deployed' ||
+           storageManager.getItem('localTestMode') === 'true';
+  });
 
   const {
     status,
@@ -155,9 +167,26 @@ function UserApp() {
     sendCommand
   } = useBackendStatus();
 
-  const showToast = (message, type = 'error') => {
+  const showToast = useCallback((message, type = 'error') => {
     setToast({ message, type });
-  };
+  }, []);
+
+  // Keep isDashboardEnabled in sync with deployment/localTest status changes
+  useEffect(() => {
+    const syncDashboardEnabled = () => {
+      setIsDashboardEnabled(
+        storageManager.getItem('deploymentStatus') === 'deployed' ||
+        storageManager.getItem('localTestMode') === 'true'
+      );
+    };
+    window.addEventListener('deploymentStatusChanged', syncDashboardEnabled);
+    // Also sync when storage changes from another tab
+    window.addEventListener('storage', syncDashboardEnabled);
+    return () => {
+      window.removeEventListener('deploymentStatusChanged', syncDashboardEnabled);
+      window.removeEventListener('storage', syncDashboardEnabled);
+    };
+  }, []);
 
   // Monitor deployment system status - auto-reset if backend stops
   const { isMonitoring, startMonitoring, stopMonitoring } = useWorkflowMonitor(showToast);
@@ -183,8 +212,7 @@ function UserApp() {
 
     checkAuth();
 
-    // ✅ NEW: Initialize tunnel manager on app startup
-    console.log('🌐 Initializing tunnel manager on app startup...');
+    // Initialize tunnel manager on app startup
     tunnelStorage.initializeTunnelManager();
 
     // Generate unique tab ID for this tab (only once on mount)
@@ -197,15 +225,12 @@ function UserApp() {
     }
 
     // Save config before page unload - NO WARNING, NO CANCELLATION
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = () => {
       if (window.configUpdateTimer) {
         clearTimeout(window.configUpdateTimer);
       }
-      // Save current config immediately using storage manager
-      storageManager.setItem('galaxyKickLockConfig', config);
-      
-      // DO NOT show warning or cancel deployment on refresh
-      // User can manually deactivate if they want to stop the backend
+      // Use configRef so this listener never needs to be re-registered on config changes
+      storageManager.setItem('galaxyKickLockConfig', configRef.current);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -259,13 +284,13 @@ function UserApp() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('storage', handleStorageChange);
-      
-      // Save config on unmount using storage manager
+
+      // Save config on unmount using configRef (avoids stale closure)
       if (window.configUpdateTimer) {
         clearTimeout(window.configUpdateTimer);
       }
-      storageManager.setItem('galaxyKickLockConfig', config);
-      
+      storageManager.setItem('galaxyKickLockConfig', configRef.current);
+
       // Clear active tab if this was it
       const currentTabId = sessionStorage.getItem('tabId');
       const activeTabId = storageManager.getItem('activeTabId');
@@ -273,7 +298,7 @@ function UserApp() {
         storageManager.removeItem('activeTabId');
       }
     };
-  }, [config]); // Add config as dependency
+  }, []); // Stable: configRef always has latest config; no re-registration needed
 
   // Single-session enforcement - check if logged in elsewhere
   useEffect(() => {
@@ -372,34 +397,23 @@ function UserApp() {
     }, 2000);
   };
 
-  const handleLogout = async () => {
-    // Check if user is still connected or deployed
-    const isDeployed = storageManager.getItem('deploymentStatus') === 'deployed';
-    
-    if (connected || isDeployed) {
-      // Show warning modal with auto-cleanup option
-      const issues = [];
-      if (connected) issues.push('• Still connected');
-      if (isDeployed) issues.push('• System still active');
-      
-      const message = `${issues.join('\n')}\n\nAuto-cleanup will disconnect and deactivate before logout.\n\nContinue?`;
-      
-      setLogoutWarningMessage(message);
-      setShowLogoutConfirm(true);
-      return;
-    }
-    
-    // If nothing is active, logout directly
-    performLogout();
-  };
-
-  const performLogout = async () => {
+  const performLogout = useCallback(async () => {
     setShowLogoutConfirm(false);
     showToast('Logging out...', 'info');
 
-    // DO NOT cancel deployment on logout - let backend keep running
     try {
-      // 1. Disconnect if connected
+      // 1. Send EXIT signal to backend so bot finishes cleanly
+      if (connected) {
+        try {
+          const { apiClient } = await import('./utils/api');
+          await apiClient.configure({ exitting: true });
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Give bot 3s to finish
+        } catch (err) {
+          console.warn('Failed to send exit signal during logout:', err);
+        }
+      }
+
+      // 2. Disconnect if connected
       if (connected) {
         try {
           await disconnect();
@@ -408,52 +422,69 @@ function UserApp() {
         }
       }
 
-      // 2. Just clear local state - DO NOT cancel deployment
+      // 3. Cancel pipeline (deactivate backend) if deployed
+      const isDeployed = storageManager.getItem('deploymentStatus') === 'deployed';
+      if (isDeployed) {
+        try {
+          showToast('Stopping backend pipeline...', 'info');
+          const { cancelGitLabPipeline, getLatestRunningGitLabPipeline } = await import('./utils/gitlab');
+          const pipelineId = storageManager.getItem('pipelineId') || await getLatestRunningGitLabPipeline();
+          if (pipelineId) {
+            await cancelGitLabPipeline(pipelineId);
+          }
+        } catch (err) {
+          console.warn('Failed to cancel pipeline during logout:', err);
+        }
+      }
+
+      // 4. Clear local state
       storageManager.removeItem('deploymentStatus');
       storageManager.removeItem('pipelineId');
       storageManager.removeItem('backendSubdomain');
       storageManager.removeItem('localTestMode');
 
-      // Clear backend URL
       const { clearBackendUrl } = await import('./utils/backendUrl');
       clearBackendUrl();
 
-      // Stop deployment monitoring
       stopMonitoring();
 
-      // Emit event to reset UI
       window.dispatchEvent(new CustomEvent('deploymentStatusChanged', {
         detail: { status: 'idle' }
       }));
     } catch (err) {
       console.error('Cleanup failed during logout:', err);
     }
-    
-    // 3. Perform logout
+
+    // 5. Perform logout
     await logoutUser();
     setCurrentUser(null);
     setAuthenticated(false);
-    
+
     showToast('Logged out successfully', 'success');
-  };
+  }, [connected, disconnect, stopMonitoring, showToast]);
 
-  // Show loading while checking authentication
-  if (checkingAuth) {
-    return (
-      <div className="premium-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#00f3ff' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2>INITIALIZING SYSTEM...</h2>
-        </div>
-      </div>
-    );
-  }
+  const handleLogout = useCallback(async () => {
+    // Check if user is still connected or deployed
+    const isDeployed = storageManager.getItem('deploymentStatus') === 'deployed';
 
-  // Show landing page if not authenticated
-  if (!authenticated) {
-    return <LandingPage onLoginSuccess={handleLoginSuccess} />;
-  }
+    if (connected || isDeployed) {
+      // Show warning modal with auto-cleanup option
+      const issues = [];
+      if (connected) issues.push('• Still connected');
+      if (isDeployed) issues.push('• System still active');
 
-  const handleConfigChange = (key, value) => {
+      const message = `${issues.join('\n')}\n\nAuto-cleanup will disconnect and deactivate before logout.\n\nContinue?`;
+
+      setLogoutWarningMessage(message);
+      setShowLogoutConfirm(true);
+      return;
+    }
+
+    // If nothing is active, logout directly
+    performLogout();
+  }, [connected, performLogout]);
+
+  const handleConfigChange = useCallback((key, value) => {
     setConfig(prev => {
       const newConfig = { ...prev, [key]: value };
       
@@ -495,10 +526,9 @@ function UserApp() {
 
       return newConfig;
     });
-  };
+  }, [showToast, updateConfig]);
 
-  const handleConnect = async () => {
-    console.log('🚀 CONNECT CLICKED - Full config to be sent:', config);
+  const handleConnect = useCallback(async () => {
     try {
       // Validation: Check if at least one RC code is provided
       const hasAnyCode = config.rc1 || config.rc2 || config.rc3 || config.rc4 || config.rc5;
@@ -565,17 +595,12 @@ function UserApp() {
         }
       }
 
-      // Update configuration first
-      console.log('📤 Sending config to backend before connect...');
-      
-      // Add userId to config for metrics tracking
+      // Update configuration first, then connect
       const configWithUserId = {
         ...config,
         userId: currentUser?.user_id || null
       };
-      
       await updateConfig(configWithUserId);
-      console.log('✅ Config sent (with userId), now connecting...');
       // Then connect
       await connect();
       showToast('Connected successfully!', 'success');
@@ -592,8 +617,6 @@ function UserApp() {
           }
           const healthyTunnel = tunnelManager.getHealthyTunnel();
           const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
-
-          console.log(`🤖 AI Core re-enable (on connect) via: ${backendUrl}`);
 
           if (backendUrl) {
             const aiPromises = [];
@@ -657,9 +680,9 @@ function UserApp() {
 
       showToast(errorMessage, 'error');
     }
-  };
+  }, [config, aiCoreEnabled, connect, updateConfig, currentUser, showToast]);
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = useCallback(async () => {
     try {
       await disconnect();
       
@@ -685,10 +708,10 @@ function UserApp() {
 
       showToast(errorMessage, 'error');
     }
-  };
-  
+  }, [aiCoreEnabled, disconnect, showToast]);
+
   // AI CORE toggle handler - enables/disables AI for ALL connections
-  const handleAiCoreToggle = async () => {
+  const handleAiCoreToggle = useCallback(async () => {
     if (aiCoreLoading) return;
     
     setAiCoreLoading(true);
@@ -707,8 +730,6 @@ function UserApp() {
       }
       const healthyTunnel = tunnelManager.getHealthyTunnel();
       const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
-
-      console.log(`🤖 AI Core toggle via: ${backendUrl}`);
 
       if (!backendUrl) {
         showToast('Backend not connected', 'error');
@@ -785,9 +806,9 @@ function UserApp() {
     } finally {
       setAiCoreLoading(false);
     }
-  };
+  }, [aiCoreEnabled, aiCoreLoading, config, showToast]);
 
-  const handleReleaseAll = async () => {
+  const handleReleaseAll = useCallback(async () => {
     try {
       const { apiClient } = await import('./utils/api');
       await apiClient.release();
@@ -795,9 +816,9 @@ function UserApp() {
     } catch (err) {
       showToast(`Release failed: ${err.message}`, 'error');
     }
-  };
+  }, [showToast]);
 
-  const handleFlyToPlanet = async () => {
+  const handleFlyToPlanet = useCallback(async () => {
     try {
       if (!config.planet) {
         showToast('Please enter a planet name', 'error');
@@ -826,7 +847,23 @@ function UserApp() {
     } catch (err) {
       showToast(`Fly failed: ${err.message}`, 'error');
     }
-  };
+  }, [config, status, sendCommand, showToast]);
+
+  // Show loading while checking authentication
+  if (checkingAuth) {
+    return (
+      <div className="premium-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#00f3ff' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2>INITIALIZING SYSTEM...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  // Show landing page if not authenticated
+  if (!authenticated) {
+    return <LandingPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div className="app premium-layout">
@@ -852,7 +889,7 @@ function UserApp() {
       />
 
       {/* 2. MAIN DASHBOARD (3 COLUMNS) - Dimmed until deployed or local test */}
-      <div className={`main-dashboard ${storageManager.getItem('deploymentStatus') !== 'deployed' && storageManager.getItem('localTestMode') !== 'true' ? 'dashboard-disabled' : ''}`}>
+      <div className={`main-dashboard ${!isDashboardEnabled ? 'dashboard-disabled' : ''}`}>
         {/* Left: Neural Link */}
         <NeuralLink
           config={config}
@@ -881,7 +918,7 @@ function UserApp() {
       </div>
 
       {/* 3. FOOTER LOGS - Dimmed until deployed or local test */}
-      <div className={storageManager.getItem('deploymentStatus') !== 'deployed' && storageManager.getItem('localTestMode') !== 'true' ? 'logs-disabled' : ''}>
+      <div className={!isDashboardEnabled ? 'logs-disabled' : ''}>
         <DataStreams logs={logs} />
       </div>
 

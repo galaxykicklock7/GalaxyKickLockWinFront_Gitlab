@@ -272,3 +272,14 @@
 .metrics-icon-btn:active {
   transform: scale(0.95);
 }
+
+/* ML Learning Button - Purple theme */
+.metrics-icon-btn.ml-learning-btn {
+  color: #9d4edd;
+}
+
+.metrics-icon-btn.ml-learning-btn:hover {
+  color: #c77dff;
+  transform: scale(1.2);
+}
+

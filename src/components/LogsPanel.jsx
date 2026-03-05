@@ -32,12 +32,6 @@ const LogWindow = ({ title, logs }) => {
 };
 
 const LogsPanel = ({ logs }) => {
-  console.log('LogsPanel received logs:', logs);
-  console.log('log1 length:', logs?.log1?.length);
-  console.log('log2 length:', logs?.log2?.length);
-  console.log('log3 length:', logs?.log3?.length);
-  console.log('log4 length:', logs?.log4?.length);
-  console.log('log5 length:', logs?.log5?.length);
   
   return (
     <fieldset className="logs-panel">

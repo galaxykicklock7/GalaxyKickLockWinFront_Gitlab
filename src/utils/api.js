@@ -2,8 +2,24 @@ import axios from 'axios';
 import { getBackendUrl } from './backendUrl';
 import { storageManager } from './storageManager';
 import { tunnelManager } from './tunnelManager';
+import { tunnelStorage } from './tunnelStorage';
 
-// 🔄 CACHE: Keep persistent axios instances per backend URL to reuse connections
+// Eagerly restore tunnels from localStorage so the very first API call
+// uses a tunnel URL instead of falling back to the plain backendUrl.
+// This runs synchronously at module load time — before any React render.
+tunnelStorage.initializeTunnelManager();
+
+/**
+ * Returns the best available backend URL — healthy tunnel first, plain URL as fallback.
+ * Use this everywhere instead of getBackendUrl() for raw fetch calls.
+ */
+export const getBestUrl = () => {
+  const healthyTunnel = tunnelManager.getHealthyTunnel();
+  return healthyTunnel ? healthyTunnel.url : getBackendUrl();
+};
+
+// Keep persistent axios instances per backend URL to reuse connections (max 5 entries)
+const API_INSTANCE_CACHE_MAX = 5;
 const apiInstanceCache = new Map();
 
 // Create a function to get the current axios instance with the right backend URL
@@ -83,8 +99,6 @@ const createApiInstance = () => {
         config.retryCount++;
         const delayMs = RETRY_DELAY_MS * config.retryCount;  // Exponential: 500ms, 1000ms, 1500ms
 
-        console.log(`🔄 [TUNNEL] Retry ${config.retryCount}/${MAX_RETRIES} after ${delayMs}ms for ${config.url} (Error: ${error.code})`);
-
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, delayMs));
 
@@ -108,7 +122,11 @@ const createApiInstance = () => {
     return config;
   });
 
-  // ✅ Cache the instance for future use
+  // Cache the instance; evict oldest entry if over the cap
+  if (apiInstanceCache.size >= API_INSTANCE_CACHE_MAX) {
+    const oldestKey = apiInstanceCache.keys().next().value;
+    apiInstanceCache.delete(oldestKey);
+  }
   apiInstanceCache.set(baseURL, axiosInstance);
 
   return axiosInstance;
@@ -129,12 +147,8 @@ export const apiClient = {
   // Get status
   async getStatus() {
     const api = getApi();
-    // Add timestamp to prevent caching
-    const response = await api.get(`/api/status?t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
+    const response = await api.get('/api/status', {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
     });
     return response.data;
   },
@@ -142,12 +156,8 @@ export const apiClient = {
   // Get logs
   async getLogs() {
     const api = getApi();
-    // Add timestamp to prevent caching
-    const response = await api.get(`/api/logs?t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
+    const response = await api.get('/api/logs', {
+      headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
     });
     return response.data;
   },
@@ -156,35 +166,13 @@ export const apiClient = {
   async configure(config) {
     const api = getApi();
     const backendUrl = getBackendUrl();
-    console.log('🌐 API POST /api/configure - Sending payload:', config);
-    console.log('🌐 Backend URL:', backendUrl);
-    console.log('🌐 Full URL:', backendUrl ? `${backendUrl}/api/configure` : 'NO BACKEND URL!');
-    
+
     if (!backendUrl) {
-      console.error('❌ Backend URL is null! Cannot send config.');
       throw new Error('Backend URL not configured. Enable Local Test mode or deploy backend.');
     }
-    
-    // Add username from session for metrics tracking
-    const session = storageManager.getItem('galaxyKickLockSession');
-    let username = null;
-    if (session) {
-      try {
-        const sessionData = JSON.parse(session);
-        username = sessionData.username;
-      } catch (err) {
-        console.warn('Failed to parse session for username:', err);
-      }
-    }
-    
-    try {
-      const response = await api.post('/api/configure', config);
-      console.log('✅ API POST /api/configure - Response:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ API POST /api/configure - Error:', error);
-      throw error;
-    }
+
+    const response = await api.post('/api/configure', config);
+    return response.data;
   },
 
   // Connect

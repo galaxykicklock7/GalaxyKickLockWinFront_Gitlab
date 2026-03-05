@@ -151,7 +151,11 @@ export const tunnelStorage = {
     // ✅ FIXED: Only load tunnels that are part of current deployment
     // Filter out old tunnels from previous deployments
     const currentSubdomain = storageManager.getItem('backendSubdomain');
-    const currentTunnels = tunnels.filter(url => url.includes(currentSubdomain));
+
+    // If subdomain is missing, load all stored tunnels rather than wiping them
+    const currentTunnels = currentSubdomain
+      ? tunnels.filter(url => url.includes(currentSubdomain))
+      : tunnels;
 
     if (currentTunnels.length === 0) {
       console.log('📌 Stored tunnels are from old deployments - clearing them');

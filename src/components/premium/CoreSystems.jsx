@@ -186,7 +186,7 @@ const CoreSystems = ({ config, onConfigChange, onAiCoreToggle, aiCoreEnabled, ai
                                 opacity: aiCoreEnabled ? 1 : 0.5,
                                 pointerEvents: aiCoreEnabled ? 'auto' : 'none'
                             }}
-                            title={aiCoreEnabled ? "1775 - 1875" : "Enable AI CORE to use speed presets"}
+                            title={!aiCoreEnabled ? "Enable AI CORE to use speed presets" : ""}
                         >
                             SLOW
                         </div>
@@ -198,7 +198,7 @@ const CoreSystems = ({ config, onConfigChange, onAiCoreToggle, aiCoreEnabled, ai
                                 opacity: aiCoreEnabled ? 1 : 0.5,
                                 pointerEvents: aiCoreEnabled ? 'auto' : 'none'
                             }}
-                            title={aiCoreEnabled ? "1875 - 1975" : "Enable AI CORE to use speed presets"}
+                            title={!aiCoreEnabled ? "Enable AI CORE to use speed presets" : ""}
                         >
                             NORMAL
                         </div>
@@ -210,7 +210,7 @@ const CoreSystems = ({ config, onConfigChange, onAiCoreToggle, aiCoreEnabled, ai
                                 opacity: aiCoreEnabled ? 1 : 0.5,
                                 pointerEvents: aiCoreEnabled ? 'auto' : 'none'
                             }}
-                            title={aiCoreEnabled ? "1975 - 2150" : "Enable AI CORE to use speed presets"}
+                            title={!aiCoreEnabled ? "Enable AI CORE to use speed presets" : ""}
                         >
                             FAST
                         </div>

@@ -1,0 +1,56 @@
+.timer-status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.timer-status-normal {
+  background-color: #888;
+}
+
+.timer-status-success {
+  background-color: #44ff44;
+  box-shadow: 0 0 4px #44ff44;
+}
+
+.timer-status-adjusting {
+  background-color: #ffaa44;
+  box-shadow: 0 0 4px #ffaa44;
+}
+
+.timer-status-stuck-max {
+  background-color: #ff4444;
+  box-shadow: 0 0 6px #ff4444;
+  animation: blink-red 1s infinite;
+}
+
+.timer-status-stuck-min {
+  background-color: #ff8844;
+  box-shadow: 0 0 6px #ff8844;
+  animation: blink-orange 1s infinite;
+}
+
+@keyframes blink-red {
+  0%, 50% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  51%, 100% { 
+    opacity: 0.3; 
+    transform: scale(0.9);
+  }
+}
+
+@keyframes blink-orange {
+  0%, 50% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  51%, 100% { 
+    opacity: 0.4; 
+    transform: scale(0.9);
+  }
+}

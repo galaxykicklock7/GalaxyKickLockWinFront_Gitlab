@@ -4,12 +4,12 @@ import { clearBackendUrl } from '../utils/backendUrl';
 import { storageManager } from '../utils/storageManager';
 
 /**
- * Custom hook to monitor GitLab pipeline status
- * Detects when backend pipeline stops/crashes and auto-resets UI
+ * Custom hook to monitor deployment system status
+ * Detects when backend deployment stops/crashes and auto-resets UI
  */
 export const useWorkflowMonitor = (showToast) => {
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [pipelineId, setPipelineId] = useState(null);
+  const [deploymentId, setDeploymentId] = useState(null);
 
   const resetDeploymentState = useCallback((reason) => {
     // Clear deployment state using storage manager
@@ -26,37 +26,37 @@ export const useWorkflowMonitor = (showToast) => {
     // Show toast notification
     if (showToast) {
       showToast(
-        `Deployment closed unexpectedly. ${reason}. Please activate deployment again.`,
+        `System closed unexpectedly. ${reason}. Please activate system again.`,
         'error'
       );
     }
 
     // Stop monitoring
     setIsMonitoring(false);
-    setPipelineId(null);
+    setDeploymentId(null);
   }, [showToast]);
 
-  const checkPipelineStatus = useCallback(async () => {
-    if (!pipelineId) return;
+  const checkDeploymentStatus = useCallback(async () => {
+    if (!deploymentId) return;
 
     try {
-      const result = await getGitLabPipelineStatus(pipelineId);
+      const result = await getGitLabPipelineStatus(deploymentId);
 
       if (!result.success) {
         return;
       }
 
-      // Check if pipeline has stopped
+      // Check if deployment has stopped
       if (result.status === 'success' || result.status === 'failed' || result.status === 'canceled' || result.status === 'skipped') {
-        // Pipeline completed
-        let reason = 'Pipeline completed';
+        // Deployment completed
+        let reason = 'Deployment completed';
 
         if (result.status === 'success') {
-          reason = 'Pipeline finished successfully';
+          reason = 'System finished successfully';
         } else if (result.status === 'failed') {
-          reason = 'Pipeline failed';
+          reason = 'System failed';
         } else if (result.status === 'canceled') {
-          reason = 'Pipeline was cancelled';
+          reason = 'System was cancelled';
         }
 
         resetDeploymentState(reason);
@@ -64,47 +64,47 @@ export const useWorkflowMonitor = (showToast) => {
     } catch (error) {
       // Silent error - don't expose system details
     }
-  }, [pipelineId, resetDeploymentState]);
+  }, [deploymentId, resetDeploymentState]);
 
   // Start monitoring when deployment is active
   useEffect(() => {
     const savedDeploymentStatus = storageManager.getItem('deploymentStatus');
-    const savedPipelineId = storageManager.getItem('pipelineId');
+    const savedDeploymentId = storageManager.getItem('pipelineId');
     
-    if (savedDeploymentStatus === 'deployed' && savedPipelineId) {
-      setPipelineId(parseInt(savedPipelineId));
+    if (savedDeploymentStatus === 'deployed' && savedDeploymentId) {
+      setDeploymentId(parseInt(savedDeploymentId));
       setIsMonitoring(true);
     }
   }, []);
 
-  // Monitor pipeline status with smart polling
+  // Monitor deployment status with smart polling
   useEffect(() => {
-    if (!isMonitoring || !pipelineId) return;
+    if (!isMonitoring || !deploymentId) return;
 
     // Check immediately
-    checkPipelineStatus();
+    checkDeploymentStatus();
 
     // Then check every 10 seconds
     const monitorInterval = setInterval(() => {
-      checkPipelineStatus();
+      checkDeploymentStatus();
     }, 10000); // 10 seconds
 
     return () => {
       clearInterval(monitorInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMonitoring, pipelineId]); // checkPipelineStatus removed to prevent restart loop
+  }, [isMonitoring, deploymentId]); // checkDeploymentStatus removed to prevent restart loop
 
   // Start monitoring manually (called after successful deployment)
   const startMonitoring = useCallback((runId) => {
-    setPipelineId(runId);
+    setDeploymentId(runId);
     setIsMonitoring(true);
   }, []);
 
   // Stop monitoring manually
   const stopMonitoring = useCallback(() => {
     setIsMonitoring(false);
-    setPipelineId(null);
+    setDeploymentId(null);
   }, []);
 
   return {

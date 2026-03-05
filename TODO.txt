@@ -1,0 +1,38 @@
+1. Fix not update time or reason ** check once..
+---------------------------------------------------
+2. ML is not coming automatic i have to refresh the page to get it on first time - still seeing issue.
+3. Use nearby ci cd than us as of now.
+----------------------------------------------------
+---
+LATEST CHANGES (Jan 25, 2026):
+
+AI CORE TIMING CONFLICT FIX (✅ COMPLETE):
+- Fixed getTiming() to use separate attackTiming/defenseTiming
+- Disabled Auto Interval when AI is active (prevents conflict)
+- Initialize BOTH attack and defense timings on AI start
+- Attack timing for JOIN events (aggressive)
+- Defense timing for 353 events (defensive)
+- No more timing conflicts between AI and Auto Interval
+
+ML LEARNING FIXES:
+- Stuck detection: 6 attempts (balanced)
+- FAILURE handling: Phase 1 (-50ms), Phase 3 (-10ms)
+- Stuck logic: 3S_ERROR → +25ms, FAILURE → -25ms
+- Logic: 3S_ERROR = too fast, FAILURE = too slow
+
+DATABASE CLEANUP:
+- Frontend registers for auto-cleanup on mount
+- Backend cleans every 3 minutes
+- Deletes ALL metrics (regular + ML)
+
+ML MODAL FIX:
+- Loads data on first open (no refresh needed)
+
+FILES MODIFIED:
+- backend/resources/app/src/game/gameLogic.js (AI timing fixes)
+- backend/resources/app/src/ai/ultraFastLearner.js
+- src/components/MLLearningModal.jsx
+- src/components/premium/NeuralLink.jsx
+- AI_CORE_TIMING_CONFLICT_ANALYSIS.md (updated with fixes)
+
+RESTART BACKEND to apply changes!

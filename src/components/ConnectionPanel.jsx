@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaChartLine } from 'react-icons/fa';
+import { FaChartLine, FaBrain } from 'react-icons/fa';
 import MetricsModal from './MetricsModal';
+import MLLearningModal from './MLLearningModal';
+import TimerStatusIndicator from './TimerStatusIndicator';
 import './ConnectionPanel.css';
 
 const ConnectionPanel = ({
@@ -12,20 +14,35 @@ const ConnectionPanel = ({
   onFlyToPlanet,
   connected,
   loading,
-  status
+  status,
+  backendUrl
 }) => {
   const [showMetrics, setShowMetrics] = useState(false);
+  const [showMLLearning, setShowMLLearning] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [metricsData, setMetricsData] = useState({});
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [userId, setUserId] = useState(null);
+
+  // Get user ID from Supabase
+  useEffect(() => {
+    const getUserId = async () => {
+      const { supabase } = await import('../utils/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
 
   // Fetch metrics data from backend
   const fetchMetricsData = async (connNum) => {
     setLoadingMetrics(true);
     try {
-      const { getBackendUrl } = await import('../utils/backendUrl');
+      const { getBestUrl } = await import('../utils/api');
       const { supabase } = await import('../utils/supabase');
-      const backendUrl = getBackendUrl();
+      const backendUrl = getBestUrl();
       
       if (!backendUrl) {
         console.warn('Backend not active');
@@ -81,6 +98,11 @@ const ConnectionPanel = ({
     }
   };
 
+  const handleMLLearningClick = (connNum) => {
+    setSelectedConnection(connNum);
+    setShowMLLearning(true);
+  };
+
   return (
     <>
       <fieldset className="connection-panel">
@@ -92,7 +114,21 @@ const ConnectionPanel = ({
               <div className="code-labels">
                 <span className="code-label-with-status">
                   <span className={`ws-status-dot ${status?.websockets?.[`ws${num}`] ? 'ws-connected' : 'ws-disconnected'}`}></span>
+                  {config.timershift && backendUrl && userId && (
+                    <TimerStatusIndicator wsNumber={num} backendUrl={backendUrl} userId={userId} />
+                  )}
                   Code {num}
+                  <button 
+                    className="metrics-icon-btn ml-learning-btn"
+                    onClick={() => {
+                      console.log('ML Learning clicked for connection', num);
+                      handleMLLearningClick(num);
+                    }}
+                    title={`View ML Learning for Conn ${num}`}
+                    style={{ display: 'inline-flex' }}
+                  >
+                    <FaBrain />
+                  </button>
                   <button 
                     className="metrics-icon-btn"
                     onClick={() => handleMetricsClick(num)}
@@ -236,6 +272,15 @@ const ConnectionPanel = ({
         connectionNumber={selectedConnection}
         imprisonData={selectedConnection ? (metricsData[selectedConnection] || []) : []}
         loading={loadingMetrics}
+      />
+
+      {/* ML Learning Modal */}
+      <MLLearningModal
+        isOpen={showMLLearning}
+        onClose={() => setShowMLLearning(false)}
+        connectionNumber={selectedConnection}
+        backendUrl={backendUrl}
+        userId={userId}
       />
     </>
   );

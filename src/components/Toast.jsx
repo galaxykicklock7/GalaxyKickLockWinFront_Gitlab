@@ -13,7 +13,7 @@ const Toast = ({ message, type = 'error', onClose }) => {
     // Set new timer
     timerRef.current = setTimeout(() => {
       onClose();
-    }, 3000);
+    }, 5000);
 
     // Cleanup on unmount
     return () => {

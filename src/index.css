@@ -114,3 +114,94 @@ html {
 body {
   -webkit-overflow-scrolling: touch;
 }
+
+/* ========== BUTTON PRESS ANIMATIONS (Windows-like) ========== */
+button {
+  position: relative;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Active state - pressed down effect */
+button:active {
+  transform: scale(0.96) translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  filter: brightness(0.9);
+}
+
+/* Hover state - subtle lift */
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  filter: brightness(1.1);
+}
+
+/* Disabled state */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+}
+
+/* Focus visible (keyboard navigation) */
+button:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline */
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Ripple effect on click */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+  pointer-events: none;
+}
+
+button:active::before {
+  width: 100%;
+  height: 100%;
+  animation: ripple 0.6s ease-out;
+}
+
+/* Specific button types */
+button[type="submit"]:active,
+button[type="button"]:active,
+input[type="submit"]:active,
+input[type="button"]:active {
+  transform: scale(0.96) translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Touch device optimization */
+@media (hover: none) and (pointer: coarse) {
+  button:active {
+    transform: scale(0.94) translateY(2px);
+  }
+}

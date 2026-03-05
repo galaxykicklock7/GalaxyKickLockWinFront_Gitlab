@@ -1,4 +1,4 @@
-// GitLab Pipeline management utilities
+// Deployment system management utilities
 
 const GITLAB_TOKEN = import.meta.env.VITE_GITLAB_TOKEN;
 const GITLAB_PROJECT_ID = import.meta.env.VITE_GITLAB_PROJECT_ID;

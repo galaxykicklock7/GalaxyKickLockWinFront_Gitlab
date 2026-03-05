@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaDownload, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import './MetricsModal.css';
 
-const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData }) => {
+const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData, loading }) => {
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,7 +109,12 @@ const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData }) => {
 
         {/* Content */}
         <div className="metrics-content">
-          {imprisonData.length === 0 ? (
+          {loading ? (
+            <div className="no-data">
+              <div className="no-data-icon">⏳</div>
+              <div className="no-data-text">Loading Metrics...</div>
+            </div>
+          ) : imprisonData.length === 0 ? (
             <div className="no-data">
               <div className="no-data-icon">📊</div>
               <div className="no-data-text">No Imprisonment Data Yet</div>
