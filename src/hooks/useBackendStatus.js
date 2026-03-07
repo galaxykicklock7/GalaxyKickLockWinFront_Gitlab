@@ -26,14 +26,14 @@ export const useBackendStatus = () => {
       // Auto-reconnect: if backend says not connected but we were before refresh,
       // automatically reconnect once (config is already persisted in localStorage)
       if (!statusData.connected && !autoReconnectAttempted.current &&
-          sessionStorage.getItem('wsConnected') === 'true') {
+          storageManager.getItem('wsConnected') === 'true') {
         autoReconnectAttempted.current = true;
-        sessionStorage.setItem('wsConnected', 'false');
+        storageManager.setItem('wsConnected', 'false');
         // Fire-and-forget reconnect — don't await, let polling update state
         apiClient.connect().catch(() => {});
       } else {
         setConnected(statusData.connected);
-        sessionStorage.setItem('wsConnected', statusData.connected ? 'true' : 'false');
+        storageManager.setItem('wsConnected', statusData.connected ? 'true' : 'false');
       }
 
       setError(null);
@@ -42,7 +42,7 @@ export const useBackendStatus = () => {
       consecutiveFailures.current++;
       if (err.code !== 'NETWORK_ERROR') {
         setConnected(false);
-        sessionStorage.setItem('wsConnected', 'false');
+        storageManager.setItem('wsConnected', 'false');
       }
       if (consecutiveFailures.current >= 10) {
         console.warn('⚠️ Backend unreachable for 10 seconds, but keeping deployment active');
@@ -130,7 +130,7 @@ export const useBackendStatus = () => {
       } else {
         setLoading(false);
         setConnected(false);
-        sessionStorage.setItem('wsConnected', 'false');
+        storageManager.setItem('wsConnected', 'false');
       }
     };
 
@@ -149,7 +149,7 @@ export const useBackendStatus = () => {
     try {
       setLoading(true);
       const result = await apiClient.connect();
-      sessionStorage.setItem('wsConnected', 'true');
+      storageManager.setItem('wsConnected', 'true');
       // Reset failure counter and restart polling if it was stopped
       consecutiveFailures.current = 0;
       if (!pollingIntervalRef.current && storageManager.getItem('deploymentStatus') === 'deployed') {
@@ -175,7 +175,7 @@ export const useBackendStatus = () => {
     try {
       setLoading(true);
       const result = await apiClient.disconnect();
-      sessionStorage.setItem('wsConnected', 'false');
+      storageManager.setItem('wsConnected', 'false');
       await fetchStatus();
       return result;
     } catch (err) {
