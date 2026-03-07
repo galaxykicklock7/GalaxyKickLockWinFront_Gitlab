@@ -73,8 +73,16 @@ function UserApp() {
   // Initialize storage manager on mount
   useEffect(() => {
     const initStorage = async () => {
-      await storageManager.initialize();
-      setStorageReady(true);
+      try {
+        await storageManager.initialize();
+        // Give a small delay to ensure cache is fully populated
+        await new Promise(resolve => setTimeout(resolve, 100));
+        setStorageReady(true);
+      } catch (err) {
+        console.error('Storage initialization failed:', err);
+        // Still set ready to prevent infinite loading
+        setStorageReady(true);
+      }
     };
     
     initStorage();
@@ -161,10 +169,7 @@ function UserApp() {
   const [aiCoreLoading, setAiCoreLoading] = useState(false);
 
   // Dashboard/logs enabled when deployed OR in local test mode
-  const [isDashboardEnabled, setIsDashboardEnabled] = useState(() => {
-    return storageManager.getItem('deploymentStatus') === 'deployed' ||
-           storageManager.getItem('localTestMode') === 'true';
-  });
+  const [isDashboardEnabled, setIsDashboardEnabled] = useState(false);
 
   const {
     status,
@@ -202,11 +207,14 @@ function UserApp() {
   // Monitor deployment system status - auto-reset if backend stops
   const { isMonitoring, startMonitoring, stopMonitoring } = useWorkflowMonitor(showToast);
 
-  // Check authentication on mount
+  // Check authentication AFTER storage is ready
   useEffect(() => {
+    if (!storageReady) return; // Wait for storage to initialize
+    
     const checkAuth = () => {
       if (isAuthenticated()) {
         const session = getSession();
+        
         if (session) {
           setCurrentUser(session);
           setAuthenticated(true);
@@ -222,6 +230,11 @@ function UserApp() {
     };
 
     checkAuth();
+    
+    // Also restore dashboard enabled state from storage
+    const deploymentStatus = storageManager.getItem('deploymentStatus');
+    const localTestMode = storageManager.getItem('localTestMode');
+    setIsDashboardEnabled(deploymentStatus === 'deployed' || localTestMode === 'true');
 
     // Initialize connection manager on app startup
     backendStorage.initializeConnectionManager().catch(err => {
@@ -311,7 +324,7 @@ function UserApp() {
         storageManager.removeItem('activeTabId');
       }
     };
-  }, []); // Stable: configRef always has latest config; no re-registration needed
+  }, [storageReady]); // Add storageReady dependency
 
   // Single-session enforcement - check if logged in elsewhere
   useEffect(() => {

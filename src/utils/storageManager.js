@@ -37,27 +37,52 @@ for (const [key, value] of Object.entries(KEY_MAP)) {
 let cache = new Map();
 let initialized = false;
 let encryptionKey = null;
+let pendingEncryptions = new Set();
 
 /**
  * Get or create encryption key (similar to payloadCrypto pattern)
+ * Uses a stable master key stored in localStorage
  */
 async function getKey() {
   if (encryptionKey) return encryptionKey;
 
   const encoder = new TextEncoder();
   
-  // Use a stable salt based on browser fingerprint
-  const fingerprint = [
-    navigator.userAgent,
-    navigator.language,
-    new Date().getTimezoneOffset(),
-    screen.colorDepth,
-    screen.width + 'x' + screen.height
-  ].join('|');
+  // Get or create a stable master key
+  let masterKey = localStorage.getItem('_mk');
+  if (!masterKey) {
+    // Generate a new random master key
+    const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+    masterKey = btoa(String.fromCharCode(...randomBytes));
+    localStorage.setItem('_mk', masterKey);
+  } else if (masterKey.startsWith('_enc_')) {
+    // Master key was encrypted by mistake - remove all encrypted data and start fresh
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Master key was encrypted - clearing all encrypted data');
+    }
+    
+    // Remove all encrypted entries
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('_')) {
+        const value = localStorage.getItem(key);
+        if (value && value.startsWith('_enc_')) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    // Generate new master key
+    const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+    masterKey = btoa(String.fromCharCode(...randomBytes));
+    localStorage.setItem('_mk', masterKey);
+  }
 
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(fingerprint),
+    encoder.encode(masterKey),
     { name: 'PBKDF2' },
     false,
     ['deriveBits', 'deriveKey']
@@ -169,6 +194,9 @@ async function initialize() {
     await getKey();
 
     // Load existing encrypted values into cache
+    let loadedCount = 0;
+    let failedCount = 0;
+    
     for (let i = 0; i < localStorage.length; i++) {
       const obfuscatedKey = localStorage.key(i);
       if (!obfuscatedKey || !obfuscatedKey.startsWith('_')) continue;
@@ -177,46 +205,68 @@ async function initialize() {
       if (!encryptedValue) continue;
 
       try {
+        // Skip the master key - it should never be encrypted
+        if (obfuscatedKey === '_mk') {
+          continue;
+        }
+        
         if (encryptedValue.startsWith('_enc_')) {
           // Try to decrypt with new key
           try {
             const decryptedValue = await decryptValue(encryptedValue);
             const realKey = REVERSE_KEY_MAP[obfuscatedKey] || obfuscatedKey;
             cache.set(realKey, decryptedValue);
+            loadedCount++;
           } catch (decryptErr) {
             // Decryption failed - likely encrypted with old key
-            // Remove it so it can be re-created fresh
+            failedCount++;
+            
             if (import.meta.env.DEV) {
-              console.log('Removing entry encrypted with old key:', obfuscatedKey);
+              console.warn(`✗ Failed to decrypt ${obfuscatedKey}:`, decryptErr.message);
             }
+            
+            // Remove it so it can be re-created fresh
             localStorage.removeItem(obfuscatedKey);
           }
         } else {
           // Old unencrypted obfuscated value - migrate it
           const realKey = REVERSE_KEY_MAP[obfuscatedKey] || obfuscatedKey;
           cache.set(realKey, encryptedValue);
+          loadedCount++;
+          
           // Re-encrypt it with new key
           const encrypted = await encryptValue(encryptedValue);
           localStorage.setItem(obfuscatedKey, encrypted);
         }
       } catch (err) {
         // Remove corrupted entries
+        failedCount++;
+        
         if (import.meta.env.DEV) {
           console.warn('Removing corrupted storage entry:', obfuscatedKey, err);
         }
         localStorage.removeItem(obfuscatedKey);
       }
     }
+    
+    if (import.meta.env.DEV && (loadedCount > 0 || failedCount > 0)) {
+      console.log(`📦 Storage: loaded ${loadedCount}, failed ${failedCount}`);
+    }
 
     // Migrate old plain-text keys to encrypted obfuscated keys
     const keysToMigrate = Object.keys(KEY_MAP);
+    let migratedCount = 0;
+    
     for (const logicalKey of keysToMigrate) {
       const plainValue = localStorage.getItem(logicalKey);
       if (plainValue !== null) {
         // Old unencrypted entry found - migrate it
+        migratedCount++;
+        
         if (!cache.has(logicalKey)) {
           cache.set(logicalKey, plainValue);
         }
+        
         try {
           const obfuscatedKey = KEY_MAP[logicalKey];
           const encrypted = await encryptValue(plainValue);
@@ -231,27 +281,29 @@ async function initialize() {
 
     initialized = true;
     
-    // Log summary
-    const migratedCount = keysToMigrate.filter(k => localStorage.getItem(k) === null).length;
+    // Debug: show what's in cache (dev mode only)
+    if (import.meta.env.DEV) {
+      console.log(`📦 Cache contents (${cache.size} items):`, Array.from(cache.keys()));
+      console.log(`📦 LocalStorage keys:`, Object.keys(localStorage).filter(k => k.startsWith('_')));
+    }
     
-    // Check if this is first run after encryption update
-    const isFirstRunAfterUpdate = migratedCount > 0 || 
-      Object.keys(localStorage).some(k => k.startsWith('_') && localStorage.getItem(k)?.startsWith('_enc_'));
-    
+    // Log summary (only in dev mode or if there were migrations)
     if (migratedCount > 0) {
-      console.log(`✓ Storage initialized: migrated ${migratedCount} keys to encrypted storage`);
+      if (import.meta.env.DEV) {
+        console.log(`✓ Storage initialized: migrated ${migratedCount} keys to encrypted storage`);
+      }
       
       // Show one-time info message about migration
       if (!sessionStorage.getItem('_migration_info_shown')) {
         sessionStorage.setItem('_migration_info_shown', 'true');
-        console.info(
-          '%c🔐 Storage Security Update',
-          'color: #00f3ff; font-size: 14px; font-weight: bold;',
-          '\nYour data has been upgraded to AES-256 encryption. Old encrypted data was cleaned up. You may need to re-enter some settings.'
-        );
+        if (import.meta.env.DEV) {
+          console.info(
+            '%c🔐 Storage Security Update',
+            'color: #00f3ff; font-size: 14px; font-weight: bold;',
+            '\nYour data has been upgraded to AES-256 encryption. Old encrypted data was cleaned up. You may need to re-enter some settings.'
+          );
+        }
       }
-    } else {
-      console.log('✓ Storage manager initialized with encryption');
     }
   } catch (err) {
     console.error('Storage initialization error:', err);
@@ -310,17 +362,23 @@ function getItem(key) {
 function setItem(key, value) {
   try {
     const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    const obfuscatedKey = getObfuscatedKey(key);
+    
+    // ALWAYS store to localStorage immediately (unencrypted) for instant availability
+    // This ensures data survives page refresh even if encryption hasn't completed
+    localStorage.setItem(obfuscatedKey, stringValue);
     
     // Update cache if initialized
     if (initialized) {
       cache.set(key, stringValue);
-      // Encrypt and save asynchronously
-      encryptAndSave(key, stringValue);
-    } else {
-      // Not initialized yet - store directly to localStorage without encryption
-      // This will be migrated to encrypted storage when initialize() runs
-      const obfuscatedKey = getObfuscatedKey(key);
-      localStorage.setItem(obfuscatedKey, stringValue);
+      
+      // Encrypt and save asynchronously (will overwrite the unencrypted value)
+      // BUT: Never encrypt the master key itself!
+      if (obfuscatedKey !== '_mk') {
+        const promise = encryptAndSave(key, stringValue);
+        pendingEncryptions.add(promise);
+        promise.finally(() => pendingEncryptions.delete(promise));
+      }
     }
     
     return true;
@@ -393,6 +451,15 @@ function getAllKeys() {
   return Array.from(cache.keys());
 }
 
+/**
+ * Wait for all pending encryptions to complete
+ */
+async function flush() {
+  if (pendingEncryptions.size > 0) {
+    await Promise.all(Array.from(pendingEncryptions));
+  }
+}
+
 export const storageManager = {
   initialize,
   getItem,
@@ -400,5 +467,6 @@ export const storageManager = {
   removeItem,
   clear,
   getDiagnostics,
-  getAllKeys
+  getAllKeys,
+  flush
 };
