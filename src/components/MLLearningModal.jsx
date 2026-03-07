@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes, FaBrain, FaChevronLeft, FaChevronRight, FaDownload } from 'react-icons/fa';
+import { FaTimes, FaBrain, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import './MLLearningModal.css';
 
 const MLLearningModal = ({ isOpen, onClose, connectionNumber, backendUrl, userId }) => {
@@ -207,24 +207,6 @@ const MLLearningModal = ({ isOpen, onClose, connectionNumber, backendUrl, userId
     }
 
     setTooltipPos({ x, y });
-  };
-
-  const exportData = () => {
-    const exportObj = {
-      connection: connectionNumber,
-      timestamp: new Date().toISOString(),
-      stats: stats,
-      learningData: learningData
-    };
-    
-    const dataStr = JSON.stringify(exportObj, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `conn${connectionNumber}_ml_learning_${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -534,12 +516,6 @@ const MLLearningModal = ({ isOpen, onClose, connectionNumber, backendUrl, userId
                     </button>
                   </div>
                 )}
-
-                {/* Export Button */}
-                <button className="export-btn-compact" onClick={exportData}>
-                  <FaDownload />
-                  Export ML Data
-                </button>
               </div>
             </>
           )}

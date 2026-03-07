@@ -160,6 +160,21 @@ function UserApp() {
   // Keep ref in sync so event listeners can read latest config without stale closures
   configRef.current = config;
   
+  // Reload config from storage after storage is initialized
+  useEffect(() => {
+    if (!storageReady) return;
+    
+    const savedConfig = storageManager.getItem('galaxyKickLockConfig');
+    if (savedConfig) {
+      try {
+        const parsedConfig = JSON.parse(savedConfig);
+        setConfig(parsedConfig);
+      } catch (err) {
+        console.warn('Failed to parse saved config after storage init:', err);
+      }
+    }
+  }, [storageReady]);
+  
   // AI CORE state
   const [aiCoreEnabled, setAiCoreEnabled] = useState(() => {
     // Restore from localStorage on mount
@@ -868,8 +883,8 @@ function UserApp() {
     return (
       <div className="premium-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#00f3ff' }}>
         <div style={{ textAlign: 'center' }}>
-          <h2>🔐 INITIALIZING SECURE STORAGE...</h2>
-          <p style={{ color: '#ffaa00', marginTop: '10px' }}>Decrypting your data...</p>
+          <h2>⚡ GALAXY KICK LOCK 2.0</h2>
+          <p style={{ color: '#ffaa00', marginTop: '10px' }}>Loading...</p>
         </div>
       </div>
     );

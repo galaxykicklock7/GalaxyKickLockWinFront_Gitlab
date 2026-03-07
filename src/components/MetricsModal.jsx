@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaDownload, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTimes, FaChartLine, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import './MetricsModal.css';
 
 const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData, loading }) => {
@@ -72,25 +72,6 @@ const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData, loading
       x: rect.left + rect.width / 2,
       y: rect.top
     });
-  };
-
-  // Export data as JSON
-  const exportData = () => {
-    const exportObj = {
-      connection: connectionNumber,
-      timestamp: new Date().toISOString(),
-      stats: stats,
-      imprisonments: imprisonData
-    };
-    
-    const dataStr = JSON.stringify(exportObj, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `conn${connectionNumber}_metrics_${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -341,12 +322,6 @@ const MetricsModal = ({ isOpen, onClose, connectionNumber, imprisonData, loading
                     </button>
                   </div>
                 )}
-
-                {/* Export Button */}
-                <button className="export-btn-compact" onClick={exportData}>
-                  <FaDownload />
-                  Export JSON
-                </button>
               </div>
             </>
           )}

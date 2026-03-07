@@ -13,6 +13,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
     const [selectedConnection, setSelectedConnection] = useState(null);
     const [metricsData, setMetricsData] = useState({});
     const [loadingMetrics, setLoadingMetrics] = useState(false);
+    const hasLoadedMetricsOnce = useRef({}); // Track first load per connection
     const [metricsEnabled, setMetricsEnabled] = useState(config.metricsEnabled || false);
     // Use ref instead of state so clearing the interval never causes a re-render
     // and the cleanup still works if component unmounts while modal is open
@@ -122,7 +123,11 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
 
     // Fetch metrics data from backend with retry logic
     const fetchMetricsData = async (connNum) => {
-        setLoadingMetrics(true);
+        // Only show loading on the very first load for this connection
+        if (!hasLoadedMetricsOnce.current[connNum]) {
+            setLoadingMetrics(true);
+        }
+        
         try {
             const { getBestUrl } = await import('../../utils/api');
             const backendUrl = getBestUrl();
@@ -155,6 +160,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
                     ...prev,
                     [connNum]: result.data
                 }));
+                hasLoadedMetricsOnce.current[connNum] = true; // Mark as loaded
                 return result.data;
             }
 
