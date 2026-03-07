@@ -1,378 +1,404 @@
 /**
- * Universal Storage Manager
- * Handles session persistence across all devices and browsers
- * with multiple fallback mechanisms
+ * Storage Manager
+ * 
+ * Unified storage with encryption and key obfuscation.
+ * Uses the same clean AES-GCM pattern as payloadCrypto.
  */
 
-class StorageManager {
-  constructor() {
-    this.storageAvailable = this.checkStorageAvailability();
-    this.cookieEnabled = this.checkCookieAvailability();
+// Map of logical keys to obfuscated keys
+const KEY_MAP = {
+  'galaxyKickLockSession': '_s1',
+  'railwayBackendUrl': '_e2',
+  'backendUrl': '_e2',
+  'adminSession': '_s2',
+  'galaxyKickLockConfig': '_c1',
+  'deploymentStatus': '_d1',
+  'pipelineId': '_p1',
+  'localTestMode': '_t1',
+  'activeTabId': '_a1',
+  'aiCoreEnabled': '_ai1',
+  'gitlabToken': '_g1',
+  'gitlabProjectId': '_g2',
+  'gitlabBranch': '_g3',
+  'aiChatEnabled': '_ai2',
+  'svc_endpoint': '_e3',
+  'userId': '_u1',
+  'rememberedUsername': '_r1',
+  'userSession': '_s2'
+};
+
+// Reverse mapping
+const REVERSE_KEY_MAP = {};
+for (const [key, value] of Object.entries(KEY_MAP)) {
+  REVERSE_KEY_MAP[value] = key;
+}
+
+// Storage state
+let cache = new Map();
+let initialized = false;
+let encryptionKey = null;
+
+/**
+ * Get or create encryption key (similar to payloadCrypto pattern)
+ */
+async function getKey() {
+  if (encryptionKey) return encryptionKey;
+
+  const encoder = new TextEncoder();
+  
+  // Use a stable salt based on browser fingerprint
+  const fingerprint = [
+    navigator.userAgent,
+    navigator.language,
+    new Date().getTimezoneOffset(),
+    screen.colorDepth,
+    screen.width + 'x' + screen.height
+  ].join('|');
+
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(fingerprint),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  encryptionKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gkl-storage-v1'),
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  return encryptionKey;
+}
+
+/**
+ * Encrypt value using AES-GCM (same pattern as payloadCrypto)
+ */
+async function encryptValue(value) {
+  const key = await getKey();
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = encoder.encode(value);
+
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    plaintext
+  );
+
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+
+  return '_enc_' + btoa(String.fromCharCode(...combined));
+}
+
+/**
+ * Decrypt value using AES-GCM (same pattern as payloadCrypto)
+ */
+async function decryptValue(encryptedValue) {
+  if (!encryptedValue || !encryptedValue.startsWith('_enc_')) {
+    return encryptedValue;
   }
 
-  /**
-   * Check if localStorage is available and working
-   */
-  checkStorageAvailability() {
-    try {
-      const test = '__storage_test__';
-      localStorage.setItem(test, test);
-      localStorage.removeItem(test);
-      return true;
-    } catch (e) {
-      console.warn('localStorage not available:', e);
-      return false;
-    }
-  }
+  try {
+    const key = await getKey();
+    const base64 = encryptedValue.substring(5);
+    const combined = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
 
-  /**
-   * Check if cookies are enabled
-   */
-  checkCookieAvailability() {
-    try {
-      document.cookie = 'cookietest=1; SameSite=Lax';
-      const cookieEnabled = document.cookie.indexOf('cookietest=') !== -1;
-      document.cookie = 'cookietest=1; expires=Thu, 01-Jan-1970 00:00:01 GMT; SameSite=Lax';
-      return cookieEnabled;
-    } catch (e) {
-      console.warn('Cookies not available:', e);
-      return false;
-    }
-  }
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext
+    );
 
-  /**
-   * Set item in all available storage locations
-   */
-  setItem(key, value) {
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-    let success = false;
-
-    // Try localStorage
-    if (this.storageAvailable) {
-      try {
-        localStorage.setItem(key, stringValue);
-        success = true;
-      } catch (e) {
-        console.warn('localStorage.setItem failed:', e);
-      }
-    }
-
-    // Try sessionStorage (always attempt as fallback)
-    try {
-      sessionStorage.setItem(key, stringValue);
-      success = true;
-    } catch (e) {
-      console.warn('sessionStorage.setItem failed:', e);
-    }
-
-    // Try cookie (with size limit check)
-    if (this.cookieEnabled && stringValue.length < 4000) {
-      try {
-        const expiryDate = new Date();
-        expiryDate.setHours(expiryDate.getHours() + 24);
-        const cookieValue = `${key}=${encodeURIComponent(stringValue)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
-        document.cookie = cookieValue;
-        success = true;
-      } catch (e) {
-        console.warn('Cookie set failed:', e);
-      }
-    }
-
-    // Try IndexedDB as last resort for large data
-    if (!success || stringValue.length >= 4000) {
-      this.setItemIndexedDB(key, stringValue).catch(e => {
-        console.warn('IndexedDB set failed:', e);
-      });
-    }
-
-    return success;
-  }
-
-  /**
-   * Get item from any available storage location
-   */
-  getItem(key) {
-    let value = null;
-
-    // Try localStorage first
-    if (this.storageAvailable) {
-      try {
-        value = localStorage.getItem(key);
-        if (value) {
-          // Restore to other locations if found
-          this.syncToOtherStorages(key, value);
-          return value;
-        }
-      } catch (e) {
-        console.warn('localStorage.getItem failed:', e);
-      }
-    }
-
-    // Try sessionStorage
-    try {
-      value = sessionStorage.getItem(key);
-      if (value) {
-        // Restore to localStorage if available
-        this.syncToOtherStorages(key, value);
-        return value;
-      }
-    } catch (e) {
-      console.warn('sessionStorage.getItem failed:', e);
-    }
-
-    // Try cookie
-    if (this.cookieEnabled) {
-      try {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const [name, val] = cookie.trim().split('=');
-          if (name === key && val) {
-            value = decodeURIComponent(val);
-            // Restore to storage if found
-            this.syncToOtherStorages(key, value);
-            return value;
-          }
-        }
-      } catch (e) {
-        console.warn('Cookie read failed:', e);
-      }
-    }
-
-    // Try IndexedDB as last resort
-    // Note: This is async, so we return null here and let the app handle it
-    this.getItemIndexedDB(key).then(val => {
-      if (val) {
-        this.syncToOtherStorages(key, val);
-      }
-    }).catch(e => {
-      console.warn('IndexedDB get failed:', e);
-    });
-
-    return value;
-  }
-
-  /**
-   * Sync value to all available storage locations
-   */
-  syncToOtherStorages(key, value) {
-    if (this.storageAvailable) {
-      try {
-        localStorage.setItem(key, value);
-      } catch (e) {
-        // Ignore
-      }
-    }
-
-    try {
-      sessionStorage.setItem(key, value);
-    } catch (e) {
-      // Ignore
-    }
-
-    if (this.cookieEnabled && value.length < 4000) {
-      try {
-        const expiryDate = new Date();
-        expiryDate.setHours(expiryDate.getHours() + 24);
-        document.cookie = `${key}=${encodeURIComponent(value)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-
-  /**
-   * Remove item from all storage locations
-   */
-  removeItem(key) {
-    // Remove from localStorage
-    if (this.storageAvailable) {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        console.warn('localStorage.removeItem failed:', e);
-      }
-    }
-
-    // Remove from sessionStorage
-    try {
-      sessionStorage.removeItem(key);
-    } catch (e) {
-      console.warn('sessionStorage.removeItem failed:', e);
-    }
-
-    // Remove from cookie
-    if (this.cookieEnabled) {
-      try {
-        document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
-      } catch (e) {
-        console.warn('Cookie remove failed:', e);
-      }
-    }
-
-    // Remove from IndexedDB
-    this.removeItemIndexedDB(key).catch(e => {
-      console.warn('IndexedDB remove failed:', e);
-    });
-  }
-
-  /**
-   * IndexedDB operations for large data or when other storage fails
-   */
-  async setItemIndexedDB(key, value) {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('GalaxyKickLockDB', 1);
-
-      request.onerror = () => reject(request.error);
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('storage')) {
-          db.createObjectStore('storage', { keyPath: 'key' });
-        }
-      };
-
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        const transaction = db.transaction(['storage'], 'readwrite');
-        const store = transaction.objectStore('storage');
-        const putRequest = store.put({ key, value, timestamp: Date.now() });
-
-        putRequest.onsuccess = () => resolve(true);
-        putRequest.onerror = () => reject(putRequest.error);
-      };
-    });
-  }
-
-  async getItemIndexedDB(key) {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('GalaxyKickLockDB', 1);
-
-      request.onerror = () => reject(request.error);
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('storage')) {
-          db.createObjectStore('storage', { keyPath: 'key' });
-        }
-      };
-
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('storage')) {
-          resolve(null);
-          return;
-        }
-
-        const transaction = db.transaction(['storage'], 'readonly');
-        const store = transaction.objectStore('storage');
-        const getRequest = store.get(key);
-
-        getRequest.onsuccess = () => {
-          const result = getRequest.result;
-          if (result && result.value) {
-            // Check if data is not too old (24 hours)
-            const age = Date.now() - result.timestamp;
-            if (age < 24 * 60 * 60 * 1000) {
-              resolve(result.value);
-            } else {
-              resolve(null);
-            }
-          } else {
-            resolve(null);
-          }
-        };
-
-        getRequest.onerror = () => reject(getRequest.error);
-      };
-    });
-  }
-
-  async removeItemIndexedDB(key) {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('GalaxyKickLockDB', 1);
-
-      request.onerror = () => reject(request.error);
-
-      request.onsuccess = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('storage')) {
-          resolve(true);
-          return;
-        }
-
-        const transaction = db.transaction(['storage'], 'readwrite');
-        const store = transaction.objectStore('storage');
-        const deleteRequest = store.delete(key);
-
-        deleteRequest.onsuccess = () => resolve(true);
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      };
-    });
-  }
-
-  /**
-   * Clear all storage locations
-   */
-  clear() {
-    // Clear localStorage
-    if (this.storageAvailable) {
-      try {
-        localStorage.clear();
-      } catch (e) {
-        console.warn('localStorage.clear failed:', e);
-      }
-    }
-
-    // Clear sessionStorage
-    try {
-      sessionStorage.clear();
-    } catch (e) {
-      console.warn('sessionStorage.clear failed:', e);
-    }
-
-    // Clear all cookies
-    if (this.cookieEnabled) {
-      try {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const name = cookie.split('=')[0].trim();
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
-        }
-      } catch (e) {
-        console.warn('Cookie clear failed:', e);
-      }
-    }
-
-    // Clear IndexedDB
-    try {
-      indexedDB.deleteDatabase('GalaxyKickLockDB');
-    } catch (e) {
-      console.warn('IndexedDB clear failed:', e);
-    }
-  }
-
-  /**
-   * Get storage diagnostics
-   */
-  getDiagnostics() {
-    return {
-      localStorage: this.storageAvailable,
-      sessionStorage: (() => {
-        try {
-          sessionStorage.setItem('test', 'test');
-          sessionStorage.removeItem('test');
-          return true;
-        } catch (e) {
-          return false;
-        }
-      })(),
-      cookies: this.cookieEnabled,
-      indexedDB: 'indexedDB' in window,
-      protocol: window.location.protocol,
-      userAgent: navigator.userAgent
-    };
+    const decoder = new TextDecoder();
+    return decoder.decode(plaintext);
+  } catch (err) {
+    // Don't log error here - let caller handle it
+    // This is expected when migrating from old encryption
+    throw new Error('Decryption failed - likely encrypted with different key');
   }
 }
 
-// Export singleton instance
-export const storageManager = new StorageManager();
+/**
+ * Get obfuscated key for storage
+ */
+function getObfuscatedKey(key) {
+  return KEY_MAP[key] || `_${key}`;
+}
+
+/**
+ * Initialize storage manager
+ * - Loads encryption key
+ * - Loads cached values from localStorage
+ * - Migrates old unencrypted keys
+ */
+async function initialize() {
+  if (initialized) return;
+
+  try {
+    // Check if localStorage is available
+    if (typeof localStorage === 'undefined') {
+      console.error('localStorage is not available');
+      initialized = true;
+      return;
+    }
+
+    // Test localStorage access
+    try {
+      localStorage.setItem('_test', 'test');
+      localStorage.removeItem('_test');
+    } catch (err) {
+      console.error('localStorage is blocked or unavailable:', err);
+      initialized = true;
+      return;
+    }
+
+    // Initialize encryption key
+    await getKey();
+
+    // Load existing encrypted values into cache
+    for (let i = 0; i < localStorage.length; i++) {
+      const obfuscatedKey = localStorage.key(i);
+      if (!obfuscatedKey || !obfuscatedKey.startsWith('_')) continue;
+
+      const encryptedValue = localStorage.getItem(obfuscatedKey);
+      if (!encryptedValue) continue;
+
+      try {
+        if (encryptedValue.startsWith('_enc_')) {
+          // Try to decrypt with new key
+          try {
+            const decryptedValue = await decryptValue(encryptedValue);
+            const realKey = REVERSE_KEY_MAP[obfuscatedKey] || obfuscatedKey;
+            cache.set(realKey, decryptedValue);
+          } catch (decryptErr) {
+            // Decryption failed - likely encrypted with old key
+            // Remove it so it can be re-created fresh
+            if (import.meta.env.DEV) {
+              console.log('Removing entry encrypted with old key:', obfuscatedKey);
+            }
+            localStorage.removeItem(obfuscatedKey);
+          }
+        } else {
+          // Old unencrypted obfuscated value - migrate it
+          const realKey = REVERSE_KEY_MAP[obfuscatedKey] || obfuscatedKey;
+          cache.set(realKey, encryptedValue);
+          // Re-encrypt it with new key
+          const encrypted = await encryptValue(encryptedValue);
+          localStorage.setItem(obfuscatedKey, encrypted);
+        }
+      } catch (err) {
+        // Remove corrupted entries
+        if (import.meta.env.DEV) {
+          console.warn('Removing corrupted storage entry:', obfuscatedKey, err);
+        }
+        localStorage.removeItem(obfuscatedKey);
+      }
+    }
+
+    // Migrate old plain-text keys to encrypted obfuscated keys
+    const keysToMigrate = Object.keys(KEY_MAP);
+    for (const logicalKey of keysToMigrate) {
+      const plainValue = localStorage.getItem(logicalKey);
+      if (plainValue !== null) {
+        // Old unencrypted entry found - migrate it
+        if (!cache.has(logicalKey)) {
+          cache.set(logicalKey, plainValue);
+        }
+        try {
+          const obfuscatedKey = KEY_MAP[logicalKey];
+          const encrypted = await encryptValue(plainValue);
+          localStorage.setItem(obfuscatedKey, encrypted);
+        } catch (err) {
+          console.warn('Failed to migrate key:', logicalKey);
+        }
+        // Remove old plain key
+        localStorage.removeItem(logicalKey);
+      }
+    }
+
+    initialized = true;
+    
+    // Log summary
+    const migratedCount = keysToMigrate.filter(k => localStorage.getItem(k) === null).length;
+    
+    // Check if this is first run after encryption update
+    const isFirstRunAfterUpdate = migratedCount > 0 || 
+      Object.keys(localStorage).some(k => k.startsWith('_') && localStorage.getItem(k)?.startsWith('_enc_'));
+    
+    if (migratedCount > 0) {
+      console.log(`✓ Storage initialized: migrated ${migratedCount} keys to encrypted storage`);
+      
+      // Show one-time info message about migration
+      if (!sessionStorage.getItem('_migration_info_shown')) {
+        sessionStorage.setItem('_migration_info_shown', 'true');
+        console.info(
+          '%c🔐 Storage Security Update',
+          'color: #00f3ff; font-size: 14px; font-weight: bold;',
+          '\nYour data has been upgraded to AES-256 encryption. Old encrypted data was cleaned up. You may need to re-enter some settings.'
+        );
+      }
+    } else {
+      console.log('✓ Storage manager initialized with encryption');
+    }
+  } catch (err) {
+    console.error('Storage initialization error:', err);
+    initialized = true; // Mark as initialized anyway to prevent blocking
+  }
+}
+
+/**
+ * Get item from storage (synchronous from cache)
+ * Works even before initialization by falling back to localStorage
+ */
+function getItem(key) {
+  // If initialized, use cache
+  if (initialized && cache.has(key)) {
+    return cache.get(key);
+  }
+
+  // Fallback: try to load from localStorage directly
+  // This handles the case where getItem is called before initialize() completes
+  try {
+    const obfuscatedKey = getObfuscatedKey(key);
+    const value = localStorage.getItem(obfuscatedKey);
+    
+    if (value) {
+      // If it's not encrypted, return as-is
+      if (!value.startsWith('_enc_')) {
+        if (initialized) {
+          cache.set(key, value);
+        }
+        return value;
+      }
+      // If encrypted, we can't decrypt synchronously, return null
+      // The value will be available after initialization completes
+      return null;
+    }
+    
+    // Also try the plain key for backward compatibility
+    const plainValue = localStorage.getItem(key);
+    if (plainValue && !plainValue.startsWith('_enc_')) {
+      if (initialized) {
+        cache.set(key, plainValue);
+      }
+      return plainValue;
+    }
+  } catch (err) {
+    console.error(`Failed to get item ${key}:`, err);
+  }
+
+  return null;
+}
+
+/**
+ * Set item in storage (synchronous cache + async encryption)
+ * Works even before initialization by storing directly to localStorage
+ */
+function setItem(key, value) {
+  try {
+    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    
+    // Update cache if initialized
+    if (initialized) {
+      cache.set(key, stringValue);
+      // Encrypt and save asynchronously
+      encryptAndSave(key, stringValue);
+    } else {
+      // Not initialized yet - store directly to localStorage without encryption
+      // This will be migrated to encrypted storage when initialize() runs
+      const obfuscatedKey = getObfuscatedKey(key);
+      localStorage.setItem(obfuscatedKey, stringValue);
+    }
+    
+    return true;
+  } catch (err) {
+    console.error(`Failed to set item ${key}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Encrypt and save to localStorage (async)
+ */
+async function encryptAndSave(key, value) {
+  try {
+    const encrypted = await encryptValue(value);
+    const obfuscatedKey = getObfuscatedKey(key);
+    localStorage.setItem(obfuscatedKey, encrypted);
+  } catch (err) {
+    console.error(`Failed to encrypt ${key}:`, err);
+  }
+}
+
+/**
+ * Remove item from storage
+ */
+function removeItem(key) {
+  try {
+    cache.delete(key);
+    const obfuscatedKey = getObfuscatedKey(key);
+    localStorage.removeItem(obfuscatedKey);
+    // Also remove old plain key if it exists
+    localStorage.removeItem(key);
+    return true;
+  } catch (err) {
+    console.error(`Failed to remove item ${key}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Clear all storage
+ */
+function clear() {
+  cache.clear();
+  localStorage.clear();
+  initialized = false;
+  encryptionKey = null;
+}
+
+/**
+ * Get diagnostics info
+ */
+function getDiagnostics() {
+  return {
+    initialized,
+    cacheSize: cache.size,
+    localStorageSize: localStorage.length,
+    hasEncryptionKey: !!encryptionKey,
+    encryptedKeys: Object.keys(localStorage).filter(k => {
+      const val = localStorage.getItem(k);
+      return val && val.startsWith('_enc_');
+    }).length
+  };
+}
+
+/**
+ * Get all keys (for debugging)
+ */
+function getAllKeys() {
+  return Array.from(cache.keys());
+}
+
+export const storageManager = {
+  initialize,
+  getItem,
+  setItem,
+  removeItem,
+  clear,
+  getDiagnostics,
+  getAllKeys
+};

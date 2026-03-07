@@ -1,7 +1,9 @@
 // Deployment system management utilities
-// Uses Supabase Edge Functions to call Railway API directly (no GitLab CI middleman)
+// Uses Supabase Edge Functions with encrypted payloads
 
 import { supabase } from './supabase';
+import { securityManager } from './securityManager';
+import { encryptPayload, decryptPayload } from './payloadCrypto';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -14,33 +16,67 @@ export const getCleanUsername = (username) => {
 };
 
 /**
- * Call a Supabase Edge Function
+ * Call a Supabase Edge Function with encrypted request/response
  */
 const callEdgeFunction = async (functionName, body) => {
-  const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/${functionName}`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+  try {
+    const encrypted = await encryptPayload(body);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/${functionName}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'text/plain',
+        },
+        body: encrypted,
+      }
+    );
+
+    const responseText = await response.text();
+
+    // Always try to decrypt first, regardless of HTTP status
+    let data;
+    try {
+      data = await decryptPayload(responseText);
+    } catch (decryptError) {
+      // Fallback: edge function may not encrypt yet, try plain JSON
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        // If both fail, log details and throw
+        console.error('Failed to decrypt or parse response:', {
+          functionName,
+          httpStatus: response.status,
+          responsePreview: responseText.substring(0, 100),
+          decryptError: decryptError.message,
+          parseError: parseError.message
+        });
+        
+        // Return a structured error
+        throw new Error(
+          response.status === 500 
+            ? 'Backend service error. Please try again or contact support.'
+            : `Invalid response from ${functionName}`
+        );
+      }
     }
-  );
 
-  const data = await response.json();
+    // Now check if the operation was successful
+    // Note: Even 500 errors may have encrypted error messages
+    if (!data.success) {
+      throw new Error(data.error || 'Service operation failed');
+    }
 
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || `Edge function ${functionName} failed`);
+    return data;
+  } catch (error) {
+    throw new Error(securityManager.sanitizeError(error));
   }
-
-  return data;
 };
 
 /**
- * ACTIVATE — Redeploy Railway service via Edge Function
- * Returns { success, backend_url, health, userId }
+ * ACTIVATE — Redeploy service via Edge Function
  */
 export const activateBackend = async (username) => {
   try {
@@ -59,13 +95,13 @@ export const activateBackend = async (username) => {
       userId,
     };
   } catch (error) {
-    return { success: false, error: error.message || 'Activation failed' };
+    securityManager.safeLog('error', 'Activation failed');
+    return { success: false, error: securityManager.sanitizeError(error) };
   }
 };
 
 /**
- * DEACTIVATE — Stop Railway deployment via Edge Function
- * Returns { success }
+ * DEACTIVATE — Stop deployment via Edge Function
  */
 export const deactivateBackend = async (username) => {
   try {
@@ -78,7 +114,8 @@ export const deactivateBackend = async (username) => {
 
     return { success: true };
   } catch (error) {
-    return { success: false, error: error.message || 'Deactivation failed' };
+    securityManager.safeLog('error', 'Deactivation failed');
+    return { success: false, error: securityManager.sanitizeError(error) };
   }
 };
 
@@ -104,6 +141,7 @@ export const getBackendUrlFromSupabase = async (userId) => {
       serviceId: data.railway_service_id
     };
   } catch (error) {
-    return { success: false, error: 'Failed to fetch deployment URL' };
+    securityManager.safeLog('error', 'Failed to fetch deployment');
+    return { success: false, error: securityManager.sanitizeError(error) };
   }
 };

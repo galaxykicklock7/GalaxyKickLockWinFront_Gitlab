@@ -87,10 +87,10 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
 
                 if (attempt < maxRetries) {
                     const delayMs = 500 * attempt;  // Exponential: 500ms, 1000ms, 1500ms
-                    console.log(`🔄 [RETRY] Fetch retry ${attempt}/${maxRetries} after ${delayMs}ms for ${url}`);
+                    console.log(`🔄 [RETRY] Fetch retry ${attempt}/${maxRetries} after ${delayMs}ms`);
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 } else {
-                    console.error(`❌ [RETRY] Fetch failed after ${maxRetries} retries:`, error);
+                    console.error(`❌ [RETRY] Fetch failed after ${maxRetries} retries`);
                 }
             }
         }

@@ -2,9 +2,14 @@ import axios from 'axios';
 import { getBackendUrl } from './backendUrl';
 import { connectionManager } from './connectionManager';
 import { backendStorage } from './backendStorage';
+import { securityManager } from './securityManager';
+import { proxyManager } from './proxyManager';
 
 // Restore backend URL from localStorage so the first API call uses the correct URL.
-backendStorage.initializeConnectionManager();
+// This is async but we don't await it at module level - it will complete before first API call
+backendStorage.initializeConnectionManager().catch(err => {
+  securityManager.safeLog('error', 'Failed to initialize connection manager', err);
+});
 
 /**
  * Returns the current backend URL — from connection manager or plain backendUrl.
@@ -27,11 +32,33 @@ const createApiInstance = () => {
   }
 
   const axiosInstance = axios.create({
-    baseURL,
+    baseURL: proxyManager.shouldUseProxy() ? window.location.origin : baseURL,
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
     }
+  });
+
+  // Interceptor to add proxy headers and modify URLs
+  axiosInstance.interceptors.request.use(async (config) => {
+    config.startTime = Date.now();
+    
+    // If using proxy, modify the request
+    if (proxyManager.shouldUseProxy() && baseURL) {
+      const path = config.url.startsWith('/') ? config.url : `/${config.url}`;
+      const proxyHeaders = await proxyManager.getProxyHeaders(baseURL);
+      
+      // Update URL to proxy endpoint
+      config.url = proxyManager.getProxiedUrl(baseURL, path);
+      
+      // Add proxy headers
+      config.headers = {
+        ...config.headers,
+        ...proxyHeaders
+      };
+    }
+    
+    return config;
   });
 
   // Auto-retry + health tracking
@@ -60,7 +87,10 @@ const createApiInstance = () => {
 
       const config = error.config;
       if (!config) {
-        return Promise.reject(error);
+        return Promise.reject({
+          message: securityManager.sanitizeError(error),
+          code: 'REQUEST_ERROR'
+        });
       }
 
       config.retryCount = config.retryCount || 0;
@@ -74,20 +104,26 @@ const createApiInstance = () => {
         return axiosInstance(config);
       }
 
+      // Sanitize error before returning
+      const sanitizedMessage = securityManager.sanitizeError(error);
+      
       if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED' ||
           error.message?.includes('Network Error') || error.message?.includes('CORS') ||
           error.message?.includes('ERR_FAILED')) {
-        return Promise.reject({ message: 'Network error', code: 'NETWORK_ERROR' });
+        return Promise.reject({ 
+          message: sanitizedMessage,
+          code: 'NETWORK_ERROR' 
+        });
       }
-      return Promise.reject(error);
+      
+      return Promise.reject({ 
+        message: sanitizedMessage,
+        code: error.code || 'UNKNOWN_ERROR'
+      });
     }
   );
 
-  // Store start time for response time calculation
-  axiosInstance.interceptors.request.use((config) => {
-    config.startTime = Date.now();
-    return config;
-  });
+  // Store start time for response time calculation (moved to request interceptor above)
 
   // Cache the instance; evict oldest if over cap
   if (apiInstanceCache.size >= API_INSTANCE_CACHE_MAX) {
@@ -130,7 +166,7 @@ export const apiClient = {
     const backendUrl = getBackendUrl();
 
     if (!backendUrl) {
-      throw new Error('Backend URL not configured. Enable Local Test mode or deploy backend.');
+      throw new Error('Service not configured. Please enable deployment mode.');
     }
 
     const response = await api.post('/api/configure', config);

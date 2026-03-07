@@ -6,6 +6,54 @@
 ---
 LATEST CHANGES (Jan 25, 2026):
 
+STORAGE ENCRYPTION INTEGRATION (✅ COMPLETE - Jan 25, 2026):
+- Unified storageManager.js with clean AES-GCM encryption (same pattern as payloadCrypto)
+- Automatic key obfuscation (userSession → _s2, svc_endpoint → _e3, etc.)
+- AES-256-GCM encryption for all stored values
+- Automatic migration from plain-text to encrypted storage
+- Browser fingerprint-based key derivation (stable across sessions)
+- In-memory cache for fast access
+- Backward compatible with existing storage
+- Auto-removes data encrypted with old keys (graceful migration)
+
+IMPORTANT: If you see "Decryption failed" warnings:
+- This is NORMAL during first load after update
+- Old encrypted data is automatically removed
+- You'll need to re-enter your backend URL and settings
+- Visit /cleanup-old-encryption.html for manual cleanup if needed
+
+STORAGE ARCHITECTURE:
+- storageManager.js: Core storage with encryption + obfuscation (MAIN API)
+- storage.js: Simple wrapper (uses obfuscatedStorage in prod, plain in dev)
+- obfuscatedStorage.js: Legacy, uses securityManager for encryption
+- secureStorage.js: Enterprise features (data tiers, expiry, audit)
+- backendStorage.js: Backend URL management (uses storageManager)
+- payloadCrypto.js: API payload encryption (working reference)
+
+HOW IT WORKS:
+1. App.jsx initializes storageManager on mount
+2. storageManager derives AES-256 key from browser fingerprint
+3. All keys are obfuscated (_s1, _e2, etc.) to hide purpose
+4. All values are encrypted with AES-GCM before localStorage
+5. In-memory cache provides fast synchronous access
+6. Old plain-text keys auto-migrate on first load
+
+MIGRATION TOOLS:
+- public/migrate-encryption.html: Upgrade Base64 → AES-256
+- public/clear-storage.html: Manage and cleanup storage
+
+FILES MODIFIED:
+- src/utils/storageManager.js (cleaned up, uses payloadCrypto pattern)
+- App.jsx already has initialization (no changes needed)
+
+TESTING:
+- Open DevTools → Application → Local Storage
+- All keys should start with _ (obfuscated)
+- All values should start with _enc_ (encrypted)
+- Use storageManager.getDiagnostics() to check status
+
+---
+
 AI CORE TIMING CONFLICT FIX (✅ COMPLETE):
 - Fixed getTiming() to use separate attackTiming/defenseTiming
 - Disabled Auto Interval when AI is active (prevents conflict)

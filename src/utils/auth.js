@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import rateLimiter from './rateLimiter';
 import { validateUsername, validatePassword, validateToken, detectSQLInjection } from './inputValidator';
 import { storageManager } from './storageManager';
+import { securityManager } from './securityManager';
 
 /**
  * Register a new user
@@ -61,7 +62,7 @@ export const registerUser = async (username, password, confirmPassword, token) =
     });
 
     if (error) {
-      console.error('Registration error:', error);
+      securityManager.safeLog('error', 'Registration error', error);
 
       // Provide user-friendly error messages
       if (error.message.includes('duplicate') || error.message.includes('already exists')) {
@@ -116,20 +117,20 @@ export const registerUser = async (username, password, confirmPassword, token) =
             .eq('user_id', `token_${tokenData.token_id}`);
         }
       } catch (mapErr) {
-        console.warn('Failed to remap user deployment:', mapErr);
+        securityManager.safeLog('warn', 'Failed to remap user deployment');
         // Non-critical — admin can fix manually
       }
     }
 
     return { success: true, data };
   } catch (err) {
-    console.error('Registration exception:', err);
+    securityManager.safeLog('error', 'Registration exception', err);
 
     if (err.message.includes('fetch') || err.message.includes('network')) {
       return { success: false, error: 'Unable to connect to server. Please check your internet connection.' };
     }
 
-    return { success: false, error: 'An unexpected error occurred. Please try again.' };
+    return { success: false, error: securityManager.sanitizeError(err) };
   }
 };
 
@@ -178,7 +179,7 @@ export const loginUser = async (username, password) => {
     });
 
     if (error) {
-      console.error('Login error:', error);
+      securityManager.safeLog('error', 'Login error', error);
 
       // Don't reveal specific details for security
       return { success: false, error: 'Invalid username or password' };
@@ -217,7 +218,7 @@ export const loginUser = async (username, password) => {
               .eq('user_id', cleanUsername);
           }
         } catch (cleanupErr) {
-          console.warn('Expired token cleanup failed:', cleanupErr);
+          securityManager.safeLog('warn', 'Expired token cleanup failed');
         }
         return { success: false, error: 'Your subscription has expired. Please contact admin to renew.' };
       }
@@ -230,7 +231,7 @@ export const loginUser = async (username, password) => {
 
     // Validate required session data
     if (!data.user_id || !data.username || !data.session_token) {
-      console.error('Invalid session data received');
+      securityManager.safeLog('error', 'Invalid session data received');
       return { success: false, error: 'Login failed. Invalid session data.' };
     }
 
@@ -250,9 +251,9 @@ export const loginUser = async (username, password) => {
     const stored = storageManager.setItem('galaxyKickLockSession', session);
     
     if (!stored) {
-      console.error('Failed to store session in any storage location');
+      securityManager.safeLog('error', 'Failed to store session');
       const diagnostics = storageManager.getDiagnostics();
-      console.error('Storage diagnostics:', diagnostics);
+      securityManager.safeLog('error', 'Storage diagnostics', diagnostics);
       return { 
         success: false, 
         error: 'Unable to save session. Please enable cookies and storage in your browser settings.' 
@@ -264,13 +265,13 @@ export const loginUser = async (username, password) => {
 
     return { success: true, data: session };
   } catch (err) {
-    console.error('Login exception:', err);
+    securityManager.safeLog('error', 'Login exception', err);
 
     if (err.message.includes('fetch') || err.message.includes('network')) {
       return { success: false, error: 'Unable to connect to server. Please check your internet connection.' };
     }
 
-    return { success: false, error: 'An unexpected error occurred. Please try again.' };
+    return { success: false, error: securityManager.sanitizeError(err) };
   }
 };
 
@@ -287,7 +288,7 @@ export const logoutUser = async () => {
       });
     }
   } catch (error) {
-    console.error('Logout error:', error);
+    securityManager.safeLog('error', 'Logout error', error);
   } finally {
     // Always clear all storage locations using storage manager
     storageManager.removeItem('galaxyKickLockSession');
@@ -316,8 +317,8 @@ export const logoutAllSessions = async () => {
     }
     return { success: false, error: 'No active session' };
   } catch (error) {
-    console.error('Logout all sessions error:', error);
-    return { success: false, error: error.message };
+    securityManager.safeLog('error', 'Logout all sessions error', error);
+    return { success: false, error: securityManager.sanitizeError(error) };
   }
 };
 
@@ -336,7 +337,7 @@ export const getSession = () => {
 
     // Validate session structure
     if (!session.user_id || !session.username || !session.session_token) {
-      console.warn('Invalid session structure, clearing session');
+      securityManager.safeLog('warn', 'Invalid session structure');
       logoutUser();
       return null;
     }
@@ -347,7 +348,7 @@ export const getSession = () => {
     if (session.token_expiry_date) {
       const expiryDate = new Date(session.token_expiry_date);
       if (now > expiryDate) {
-        console.warn('Subscription expired, clearing session');
+        securityManager.safeLog('warn', 'Subscription expired');
         logoutUser();
         return null;
       }
@@ -356,7 +357,7 @@ export const getSession = () => {
     // Enforce session age — if server provided expires_at, use that; otherwise 7-day max
     if (session.expires_at) {
       if (now > new Date(session.expires_at)) {
-        console.warn('Session expired (server expiry), clearing');
+        securityManager.safeLog('warn', 'Session expired');
         logoutUser();
         return null;
       }
@@ -364,7 +365,7 @@ export const getSession = () => {
       const loginTime = new Date(session.login_time);
       const daysSinceLogin = (now - loginTime) / (1000 * 60 * 60 * 24);
       if (daysSinceLogin > 7) {
-        console.warn('Session older than 7 days, clearing');
+        securityManager.safeLog('warn', 'Session older than 7 days');
         logoutUser();
         return null;
       }
@@ -372,7 +373,7 @@ export const getSession = () => {
 
     return session;
   } catch (err) {
-    console.error('Error getting session:', err);
+    securityManager.safeLog('error', 'Error getting session', err);
     // Don't logout on error - could be JSON parse issue
     // Just return null and let user try again
     return null;
@@ -403,7 +404,7 @@ export const validateSessionWithBackend = async () => {
     });
 
     if (error) {
-      console.error('Session validation error:', error);
+      securityManager.safeLog('error', 'Session validation error', error);
       // DON'T logout on error - could be network issue
       // Let the caller decide what to do
       throw error; // Throw so App.jsx can catch and handle
@@ -411,7 +412,7 @@ export const validateSessionWithBackend = async () => {
 
     if (!data || !data.valid) {
       // Session is invalid on backend - this is a real invalidation
-      console.warn('Session validation failed:', data?.error || 'Session invalid');
+      securityManager.safeLog('warn', 'Session validation failed');
       
       // Check if user was deleted by admin
       if (data?.user_deleted) {
@@ -433,7 +434,7 @@ export const validateSessionWithBackend = async () => {
 
     return { valid: true };
   } catch (err) {
-    console.error('Session validation exception:', err);
+    securityManager.safeLog('error', 'Session validation exception', err);
     // DON'T logout on exception - could be network issue
     // Throw the error so App.jsx can catch and handle
     throw err;
@@ -461,7 +462,7 @@ export const validateSession = async () => {
 
     return data;
   } catch (err) {
-    console.error('Session validation error:', err);
+    securityManager.safeLog('error', 'Session validation error', err);
     logoutUser();
     return false;
   }

@@ -69,9 +69,10 @@
         }
 
         function setLocalTestMode() {
-            localStorage.setItem('backendUrl', 'http://localhost:3000');
-            localStorage.setItem('localTestMode', 'true');
-            localStorage.setItem('deploymentStatus', 'deployed');
+            // Use obfuscated storage keys
+            localStorage.setItem('_e2', '_ob_' + btoa('http://localhost:3000')); // backendUrl
+            localStorage.setItem('_t1', '_ob_' + btoa('true')); // localTestMode
+            localStorage.setItem('_d1', '_ob_' + btoa('deployed')); // deploymentStatus
             
             document.getElementById('fix-result').innerHTML = 
                 '<span class="success">✅ Local Test Mode ENABLED\n' +

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanup Old Encryption - Galaxy Kick Lock</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00f3ff;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00f3ff;
+            text-shadow: 0 0 10px #00f3ff;
+        }
+        .subtitle {
+            text-align: center;
+            color: #ffaa00;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid #00f3ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #00f3ff;
+            color: #0a0e27;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #00d4e6;
+            box-shadow: 0 0 20px #00f3ff;
+        }
+        .success {
+            background: #00ff88;
+        }
+        .success:hover {
+            background: #00e67a;
+            box-shadow: 0 0 20px #00ff88;
+        }
+        .danger {
+            background: #ff3366;
+            color: white;
+        }
+        .danger:hover {
+            background: #e62958;
+            box-shadow: 0 0 20px #ff3366;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            color: #00ff88;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .error {
+            color: #ff3366;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧹 CLEANUP OLD ENCRYPTION</h1>
+    <p class="subtitle">Remove data encrypted with old keys</p>
+    
+    <div class="section">
+        <h2>What This Does</h2>
+        <p>This tool removes storage entries that were encrypted with the old encryption system.</p>
+        <p>After cleanup, you'll need to re-enter your backend URL and other settings.</p>
+        <p class="warning">⚠️ This is safe - it only removes encrypted data that can't be decrypted anymore.</p>
+    </div>
+
+    <div class="section">
+        <h2>Current Status</h2>
+        <button onclick="scanStorage()">🔍 Scan Storage</button>
+        <pre id="scanOutput">Click "Scan Storage" to check...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Cleanup</h2>
+        <button onclick="cleanupOldEncryption()" class="success">🧹 Remove Old Encrypted Data</button>
+        <button onclick="clearAllStorage()" class="danger">🗑️ Clear ALL Storage</button>
+        <pre id="cleanupOutput">Ready to cleanup...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Actions</h2>
+        <button onclick="window.location.href='/'">← Back to App</button>
+        <button onclick="window.location.reload()">🔄 Refresh</button>
+    </div>
+
+    <script>
+        function scanStorage() {
+            const output = document.getElementById('scanOutput');
+            let html = '<span class="status">📊 SCANNING STORAGE...</span>\n\n';
+            
+            let encrypted = 0;
+            let obfuscated = 0;
+            let plain = 0;
+            const items = [];
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+
+                const isObfuscated = key.startsWith('_');
+                const isEncrypted = value.startsWith('_enc_');
+
+                if (isEncrypted) encrypted++;
+                if (isObfuscated && !isEncrypted) obfuscated++;
+                if (!isObfuscated && !isEncrypted) plain++;
+
+                items.push({ key, value, isObfuscated, isEncrypted });
+            }
+
+            items.forEach(item => {
+                const color = item.isEncrypted ? 'status' : (item.isObfuscated ? 'warning' : 'error');
+                html += `<span class="${color}">${item.key}</span>: ${item.value.substring(0, 50)}...\n`;
+            });
+
+            html += '\n<span class="status">═══════════════════════════════</span>\n';
+            html += `Total Items: ${localStorage.length}\n`;
+            html += `<span class="status">Encrypted (_enc_): ${encrypted}</span>\n`;
+            html += `<span class="warning">Obfuscated only: ${obfuscated}</span>\n`;
+            html += `<span class="error">Plain text: ${plain}</span>\n`;
+
+            if (encrypted > 0) {
+                html += '\n<span class="warning">⚠️ Found ${encrypted} encrypted items that may need cleanup</span>\n';
+            }
+
+            output.innerHTML = html;
+        }
+
+        function cleanupOldEncryption() {
+            const output = document.getElementById('cleanupOutput');
+            
+            if (!confirm('This will remove all encrypted data. You\'ll need to re-enter your settings. Continue?')) {
+                return;
+            }
+
+            let removed = 0;
+            const keysToRemove = [];
+
+            // Find all encrypted keys
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+
+                if (value && value.startsWith('_enc_')) {
+                    keysToRemove.push(key);
+                }
+            }
+
+            // Remove them
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                removed++;
+            });
+
+            let html = '<span class="status">✓ CLEANUP COMPLETE</span>\n\n';
+            html += `Removed ${removed} encrypted items\n`;
+            html += '\n<span class="success">You can now use the app normally.</span>\n';
+            html += '<span class="warning">You\'ll need to re-enter your backend URL and settings.</span>\n';
+
+            output.innerHTML = html;
+
+            // Refresh scan
+            setTimeout(() => {
+                scanStorage();
+            }, 1000);
+        }
+
+        function clearAllStorage() {
+            if (!confirm('⚠️ This will clear ALL storage and log you out. Continue?')) {
+                return;
+            }
+
+            localStorage.clear();
+            
+            const output = document.getElementById('cleanupOutput');
+            output.innerHTML = '<span class="status">✓ All storage cleared!</span>\n' +
+                '<span class="warning">Redirecting to home page in 2 seconds...</span>';
+
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        }
+
+        // Auto-scan on load
+        window.onload = () => {
+            scanStorage();
+        };
+    </script>
+</body>
+</html>

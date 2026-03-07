@@ -138,7 +138,7 @@ const CommandBar = ({
                 throw new Error('No backend URL returned. Contact admin to set up your service.');
             }
 
-            console.log(`Railway backend URL: ${backendUrl}`);
+            // Backend URL is now stored securely (obfuscated)
             setDeploymentProgress({ percentage: 80, message: 'Backend deployed, verifying health...' });
 
             // Step 2: Health check from frontend (80% → 98%)
@@ -152,6 +152,12 @@ const CommandBar = ({
                             method: 'GET',
                             headers: {},
                             signal: AbortSignal.timeout(10000)
+                        }).catch(err => {
+                            // Ignore abort errors during health check
+                            if (err.name === 'AbortError') {
+                                return { ok: false };
+                            }
+                            throw err;
                         });
                         if (healthRes.ok) {
                             healthOk = true;
@@ -177,7 +183,7 @@ const CommandBar = ({
 
             // Save URL and finalize
             setBackendUrl(backendUrl);
-            backendStorage.saveBackendUrl(backendUrl);
+            await backendStorage.saveBackendUrl(backendUrl);
             storageManager.setItem('deploymentStatus', 'deployed');
             storageManager.setItem('userId', userId);
 

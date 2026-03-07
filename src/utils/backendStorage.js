@@ -1,57 +1,73 @@
 /**
  * Backend URL Storage Utility
  *
- * Stores and retrieves the Railway backend URL from localStorage.
+ * Stores and retrieves backend URLs with encryption from localStorage.
  * Coordinates with ConnectionManager for seamless URL management.
  */
 
 import { storageManager } from './storageManager';
 import { connectionManager } from './connectionManager';
+import { securityManager } from './securityManager';
 
-const BACKEND_URL_KEY = 'railwayBackendUrl';
+const BACKEND_URL_KEY = 'svc_endpoint';
 
 export const backendStorage = {
   /**
-   * Save the Railway backend URL
-   * @param {string} url - Railway backend URL
-   * @returns {boolean}
+   * Save the backend URL with encryption
+   * @param {string} url - Backend URL
+   * @returns {Promise<boolean>}
    */
-  saveBackendUrl(url) {
+  async saveBackendUrl(url) {
     if (!url || typeof url !== 'string') return false;
-    storageManager.setItem(BACKEND_URL_KEY, url);
-    connectionManager.setUrl(url);
-    console.log(`Backend URL saved: ${url}`);
-    return true;
+    
+    try {
+      const encrypted = await securityManager.encrypt(url);
+      storageManager.setItem(BACKEND_URL_KEY, encrypted);
+      connectionManager.setUrl(url);
+      securityManager.safeLog('log', 'Service endpoint configured');
+      return true;
+    } catch (error) {
+      securityManager.safeLog('error', 'Failed to save endpoint');
+      return false;
+    }
   },
 
   /**
-   * Load the stored Railway backend URL
-   * @returns {string|null}
+   * Load the stored backend URL with decryption
+   * @returns {Promise<string|null>}
    */
-  loadBackendUrl() {
-    return storageManager.getItem(BACKEND_URL_KEY);
+  async loadBackendUrl() {
+    try {
+      const encrypted = storageManager.getItem(BACKEND_URL_KEY);
+      if (!encrypted) return null;
+      
+      return await securityManager.decrypt(encrypted);
+    } catch (error) {
+      securityManager.safeLog('error', 'Failed to load endpoint');
+      return null;
+    }
   },
 
   /**
    * Initialize connection manager from storage on app load
    * Only loads if deployment is currently active
    */
-  initializeConnectionManager() {
+  async initializeConnectionManager() {
     const deploymentStatus = storageManager.getItem('deploymentStatus');
 
     if (deploymentStatus !== 'deployed') {
-      console.log('No active deployment - skipping backend URL initialization');
+      securityManager.safeLog('log', 'No active deployment');
       return;
     }
 
-    const url = this.loadBackendUrl();
+    const url = await this.loadBackendUrl();
     if (!url) {
-      console.log('No backend URL in storage to initialize');
+      securityManager.safeLog('log', 'No endpoint in storage');
       return;
     }
 
     connectionManager.setUrl(url);
-    console.log(`Connection manager initialized with: ${url}`);
+    securityManager.safeLog('log', 'Connection manager initialized');
   },
 
   /**
@@ -60,7 +76,7 @@ export const backendStorage = {
   clearBackendUrl() {
     connectionManager.clear();
     storageManager.removeItem(BACKEND_URL_KEY);
-    console.log('Backend URL cleared from storage and manager');
+    securityManager.safeLog('log', 'Service endpoint cleared');
   },
 
   /**

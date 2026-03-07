@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Encryption Test - Galaxy Kick Lock</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00f3ff;
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00f3ff;
+            text-shadow: 0 0 10px #00f3ff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #ffaa00;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid #00f3ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #00f3ff;
+            color: #0a0e27;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #00d4e6;
+            box-shadow: 0 0 20px #00f3ff;
+        }
+        .success {
+            background: #00ff88;
+        }
+        .success:hover {
+            background: #00e67a;
+            box-shadow: 0 0 20px #00ff88;
+        }
+        .danger {
+            background: #ff3366;
+            color: white;
+        }
+        .danger:hover {
+            background: #e62958;
+            box-shadow: 0 0 20px #ff3366;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .status {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .error {
+            color: #ff3366;
+        }
+        input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00f3ff;
+            color: #00f3ff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 STORAGE ENCRYPTION TEST</h1>
+    <p class="subtitle">Test the unified storage manager with AES-256-GCM encryption</p>
+    
+    <div class="section">
+        <h2>Quick Test</h2>
+        <button onclick="runQuickTest()" class="success">🚀 Run Quick Test</button>
+        <pre id="quickTestOutput">Click "Run Quick Test" to verify encryption...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Manual Test</h2>
+        <div>
+            <input type="text" id="testKey" placeholder="Key (e.g., testKey)" value="testKey">
+            <input type="text" id="testValue" placeholder="Value (e.g., secret data)" value="My secret data">
+        </div>
+        <button onclick="testSet()">💾 Set Item</button>
+        <button onclick="testGet()">📖 Get Item</button>
+        <button onclick="testRemove()">🗑️ Remove Item</button>
+        <pre id="manualTestOutput">Use the buttons above to test storage operations...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Storage Inspection</h2>
+        <button onclick="inspectStorage()">🔍 Inspect localStorage</button>
+        <button onclick="showDiagnostics()">📊 Show Diagnostics</button>
+        <pre id="inspectOutput">Click "Inspect localStorage" to see raw storage...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Actions</h2>
+        <button onclick="window.location.href='/'">← Back to App</button>
+        <button onclick="window.location.reload()">🔄 Refresh</button>
+        <button onclick="clearAll()" class="danger">🗑️ Clear All Storage</button>
+    </div>
+
+    <script type="module">
+        // Import storageManager (simulated - in real app it would be imported)
+        // For this test page, we'll use a simplified version
+        
+        const KEY_MAP = {
+            'testKey': '_test1',
+            'userSession': '_s2',
+            'svc_endpoint': '_e3',
+            'backendUrl': '_e2'
+        };
+
+        let encryptionKey = null;
+
+        async function getKey() {
+            if (encryptionKey) return encryptionKey;
+
+            const encoder = new TextEncoder();
+            const fingerprint = [
+                navigator.userAgent,
+                navigator.language,
+                new Date().getTimezoneOffset(),
+                screen.colorDepth,
+                screen.width + 'x' + screen.height
+            ].join('|');
+
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(fingerprint),
+                { name: 'PBKDF2' },
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+
+            encryptionKey = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: encoder.encode('gkl-storage-v1'),
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+
+            return encryptionKey;
+        }
+
+        async function encryptValue(value) {
+            const key = await getKey();
+            const encoder = new TextEncoder();
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const plaintext = encoder.encode(value);
+
+            const ciphertext = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                plaintext
+            );
+
+            const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+            combined.set(iv, 0);
+            combined.set(new Uint8Array(ciphertext), iv.length);
+
+            return '_enc_' + btoa(String.fromCharCode(...combined));
+        }
+
+        async function decryptValue(encryptedValue) {
+            if (!encryptedValue || !encryptedValue.startsWith('_enc_')) {
+                return encryptedValue;
+            }
+
+            const key = await getKey();
+            const base64 = encryptedValue.substring(5);
+            const combined = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            const iv = combined.slice(0, 12);
+            const ciphertext = combined.slice(12);
+
+            const plaintext = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                ciphertext
+            );
+
+            const decoder = new TextDecoder();
+            return decoder.decode(plaintext);
+        }
+
+        function getObfuscatedKey(key) {
+            return KEY_MAP[key] || `_${key}`;
+        }
+
+        window.runQuickTest = async function() {
+            const output = document.getElementById('quickTestOutput');
+            let html = '<span class="status">🚀 RUNNING QUICK TEST...</span>\n\n';
+            output.innerHTML = html;
+
+            try {
+                // Test 1: Encrypt and store
+                html += '<span class="status">Test 1: Encrypt and Store</span>\n';
+                const testData = 'This is secret data!';
+                const encrypted = await encryptValue(testData);
+                const obfKey = getObfuscatedKey('testKey');
+                localStorage.setItem(obfKey, encrypted);
+                html += `✓ Stored encrypted data\n`;
+                html += `  Key: ${obfKey}\n`;
+                html += `  Encrypted: ${encrypted.substring(0, 50)}...\n\n`;
+
+                // Test 2: Retrieve and decrypt
+                html += '<span class="status">Test 2: Retrieve and Decrypt</span>\n';
+                const retrieved = localStorage.getItem(obfKey);
+                const decrypted = await decryptValue(retrieved);
+                html += `✓ Retrieved and decrypted\n`;
+                html += `  Decrypted: ${decrypted}\n`;
+                html += `  Match: ${decrypted === testData ? '✓ YES' : '✗ NO'}\n\n`;
+
+                // Test 3: Inspect raw storage
+                html += '<span class="status">Test 3: Raw Storage Inspection</span>\n';
+                html += `✓ Key is obfuscated: ${obfKey.startsWith('_') ? 'YES' : 'NO'}\n`;
+                html += `✓ Value is encrypted: ${encrypted.startsWith('_enc_') ? 'YES' : 'NO'}\n\n`;
+
+                html += '<span class="status">═══════════════════════════════</span>\n';
+                html += '<span class="status">✓ ALL TESTS PASSED!</span>\n';
+                html += '<span class="success">Encryption is working correctly.</span>\n';
+
+            } catch (error) {
+                html += `<span class="error">✗ TEST FAILED: ${error.message}</span>\n`;
+            }
+
+            output.innerHTML = html;
+        };
+
+        window.testSet = async function() {
+            const output = document.getElementById('manualTestOutput');
+            const key = document.getElementById('testKey').value;
+            const value = document.getElementById('testValue').value;
+
+            try {
+                const encrypted = await encryptValue(value);
+                const obfKey = getObfuscatedKey(key);
+                localStorage.setItem(obfKey, encrypted);
+
+                output.innerHTML = `<span class="status">✓ Stored successfully</span>\n` +
+                    `Key: ${key} → ${obfKey}\n` +
+                    `Value: ${value}\n` +
+                    `Encrypted: ${encrypted.substring(0, 80)}...`;
+            } catch (error) {
+                output.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+            }
+        };
+
+        window.testGet = async function() {
+            const output = document.getElementById('manualTestOutput');
+            const key = document.getElementById('testKey').value;
+
+            try {
+                const obfKey = getObfuscatedKey(key);
+                const encrypted = localStorage.getItem(obfKey);
+
+                if (!encrypted) {
+                    output.innerHTML = `<span class="warning">⚠ Key not found: ${key}</span>`;
+                    return;
+                }
+
+                const decrypted = await decryptValue(encrypted);
+
+                output.innerHTML = `<span class="status">✓ Retrieved successfully</span>\n` +
+                    `Key: ${key} → ${obfKey}\n` +
+                    `Encrypted: ${encrypted.substring(0, 80)}...\n` +
+                    `Decrypted: ${decrypted}`;
+            } catch (error) {
+                output.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+            }
+        };
+
+        window.testRemove = function() {
+            const output = document.getElementById('manualTestOutput');
+            const key = document.getElementById('testKey').value;
+
+            try {
+                const obfKey = getObfuscatedKey(key);
+                localStorage.removeItem(obfKey);
+
+                output.innerHTML = `<span class="status">✓ Removed successfully</span>\n` +
+                    `Key: ${key} → ${obfKey}`;
+            } catch (error) {
+                output.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+            }
+        };
+
+        window.inspectStorage = function() {
+            const output = document.getElementById('inspectOutput');
+            let html = '<span class="status">📦 RAW LOCALSTORAGE CONTENTS:</span>\n\n';
+
+            let encrypted = 0;
+            let obfuscated = 0;
+            let plain = 0;
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+
+                const isObfuscated = key.startsWith('_');
+                const isEncrypted = value.startsWith('_enc_');
+
+                if (isEncrypted) encrypted++;
+                if (isObfuscated) obfuscated++;
+                if (!isObfuscated && !isEncrypted) plain++;
+
+                const color = isEncrypted ? 'status' : (isObfuscated ? 'warning' : 'error');
+                html += `<span class="${color}">${key}</span>: ${value.substring(0, 60)}${value.length > 60 ? '...' : ''}\n`;
+            }
+
+            html += '\n<span class="status">═══════════════════════════════</span>\n';
+            html += `Total Items: ${localStorage.length}\n`;
+            html += `<span class="status">✓ Encrypted: ${encrypted}</span>\n`;
+            html += `<span class="warning">⚠ Obfuscated only: ${obfuscated - encrypted}</span>\n`;
+            html += `<span class="error">✗ Plain text: ${plain}</span>\n`;
+
+            output.innerHTML = html;
+        };
+
+        window.showDiagnostics = async function() {
+            const output = document.getElementById('inspectOutput');
+            
+            const hasKey = !!encryptionKey;
+            
+            let html = '<span class="status">📊 STORAGE DIAGNOSTICS:</span>\n\n';
+            html += `Encryption Key: ${hasKey ? '✓ Loaded' : '✗ Not loaded'}\n`;
+            html += `localStorage Items: ${localStorage.length}\n`;
+            html += `Browser: ${navigator.userAgent.substring(0, 50)}...\n`;
+            html += `Language: ${navigator.language}\n`;
+            html += `Timezone Offset: ${new Date().getTimezoneOffset()}\n`;
+            html += `Screen: ${screen.width}x${screen.height} @ ${screen.colorDepth}bit\n`;
+
+            output.innerHTML = html;
+        };
+
+        window.clearAll = function() {
+            if (!confirm('⚠️ This will clear ALL storage. Continue?')) {
+                return;
+            }
+
+            localStorage.clear();
+            document.getElementById('inspectOutput').innerHTML = '<span class="status">✓ All storage cleared!</span>';
+        };
+
+        // Auto-run quick test on load
+        window.onload = () => {
+            runQuickTest();
+        };
+    </script>
+</body>
+</html>

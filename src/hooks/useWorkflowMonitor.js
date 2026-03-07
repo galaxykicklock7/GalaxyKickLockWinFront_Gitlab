@@ -39,6 +39,12 @@ export const useWorkflowMonitor = (showToast) => {
         method: 'GET',
         headers: {},
         signal: AbortSignal.timeout(10000)
+      }).catch(err => {
+        // Ignore abort errors
+        if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+          return { ok: false, status: 408 };
+        }
+        throw err;
       });
 
       if (!res.ok) {
@@ -46,6 +52,11 @@ export const useWorkflowMonitor = (showToast) => {
         console.warn(`Backend health check: HTTP ${res.status}`);
       }
     } catch (error) {
+      // Silently handle abort errors
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        return;
+      }
+      
       // Network error — backend might be down
       // Only reset if we get consistent failures (3 in a row)
       const failKey = '_healthFailCount';

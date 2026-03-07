@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Storage - Galaxy Kick Lock</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00f3ff;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00f3ff;
+            text-shadow: 0 0 10px #00f3ff;
+        }
+        .section {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid #00f3ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #00f3ff;
+            color: #0a0e27;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #00d4e6;
+            box-shadow: 0 0 20px #00f3ff;
+        }
+        .danger {
+            background: #ff3366;
+            color: white;
+        }
+        .danger:hover {
+            background: #e62958;
+            box-shadow: 0 0 20px #ff3366;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #00ff88;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .error {
+            color: #ff3366;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 STORAGE MANAGEMENT</h1>
+    
+    <div class="section">
+        <h2>Current Storage Status</h2>
+        <button onclick="showStorage()">📊 View All Storage</button>
+        <button onclick="checkObfuscation()">🔍 Check Obfuscation</button>
+        <pre id="storageOutput">Click "View All Storage" to see current data...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Migration & Cleanup</h2>
+        <button onclick="migrateKeys()">🔄 Migrate to Obfuscated Keys</button>
+        <button onclick="cleanupOldKeys()">🧹 Remove Old Unobfuscated Keys</button>
+        <pre id="migrationOutput">Ready to migrate...</pre>
+    </div>
+
+    <div class="section">
+        <h2>⚠️ Danger Zone</h2>
+        <button class="danger" onclick="clearAll()">🗑️ Clear ALL Storage</button>
+        <button onclick="window.location.href='/'">← Back to App</button>
+        <pre id="clearOutput">Use with caution!</pre>
+    </div>
+
+    <script>
+        const KEY_MAP = {
+            'galaxyKickLockSession': '_s1',
+            'galaxyKickLockConfig': '_c1',
+            'railwayBackendUrl': '_e1',
+            'backendUrl': '_e2',
+            'svc_endpoint': '_e3',
+            'adminSession': '_s3',
+            'userSession': '_s2',
+            'userId': '_u1',
+            'activeTabId': '_u2',
+            'deploymentStatus': '_d1',
+            'pipelineId': '_d2',
+            'aiCoreEnabled': '_f1',
+            'aiChatEnabled': '_f2',
+            'localTestMode': '_t1'
+        };
+
+        function obfuscateValue(value) {
+            try {
+                return '_ob_' + btoa(unescape(encodeURIComponent(value)));
+            } catch (e) {
+                return value;
+            }
+        }
+
+        function deobfuscateValue(value) {
+            try {
+                if (value && value.startsWith('_ob_')) {
+                    return decodeURIComponent(escape(atob(value.substring(4))));
+                }
+                return value;
+            } catch (e) {
+                return value;
+            }
+        }
+
+        function showStorage() {
+            const output = document.getElementById('storageOutput');
+            let html = '<span class="success">📦 LOCAL STORAGE:</span>\n';
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                const isObfuscated = key.startsWith('_') || value.startsWith('_ob_');
+                const color = isObfuscated ? 'success' : 'warning';
+                
+                html += `<span class="${color}">${key}</span>: ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}\n`;
+            }
+            
+            html += '\n<span class="success">🍪 COOKIES:</span>\n';
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const [name, val] = cookie.trim().split('=');
+                if (name && val) {
+                    const isObfuscated = name.startsWith('_') || val.startsWith('_ob_');
+                    const color = isObfuscated ? 'success' : 'warning';
+                    html += `<span class="${color}">${name}</span>: ${decodeURIComponent(val).substring(0, 100)}...\n`;
+                }
+            });
+            
+            html += '\n<span class="success">💾 SESSION STORAGE:</span>\n';
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                const isObfuscated = key.startsWith('_') || value.startsWith('_ob_');
+                const color = isObfuscated ? 'success' : 'warning';
+                
+                html += `<span class="${color}">${key}</span>: ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}\n`;
+            }
+            
+            output.innerHTML = html;
+        }
+
+        function checkObfuscation() {
+            const output = document.getElementById('storageOutput');
+            let unobfuscatedKeys = [];
+            
+            // Check localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key.startsWith('_') && KEY_MAP[key]) {
+                    unobfuscatedKeys.push(`localStorage: ${key}`);
+                }
+            }
+            
+            // Check sessionStorage
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (!key.startsWith('_') && KEY_MAP[key]) {
+                    unobfuscatedKeys.push(`sessionStorage: ${key}`);
+                }
+            }
+            
+            // Check cookies
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const [name] = cookie.trim().split('=');
+                if (name && !name.startsWith('_') && KEY_MAP[name]) {
+                    unobfuscatedKeys.push(`cookie: ${name}`);
+                }
+            });
+            
+            if (unobfuscatedKeys.length === 0) {
+                output.innerHTML = '<span class="success">✅ All keys are properly obfuscated!</span>';
+            } else {
+                output.innerHTML = '<span class="warning">⚠️ Found unobfuscated keys:</span>\n' + 
+                    unobfuscatedKeys.map(k => `<span class="warning">• ${k}</span>`).join('\n') +
+                    '\n\n<span class="warning">Click "Migrate to Obfuscated Keys" to fix this.</span>';
+            }
+        }
+
+        function migrateKeys() {
+            const output = document.getElementById('migrationOutput');
+            let migrated = [];
+            
+            Object.keys(KEY_MAP).forEach(oldKey => {
+                const newKey = KEY_MAP[oldKey];
+                
+                // Migrate localStorage
+                const lsValue = localStorage.getItem(oldKey);
+                if (lsValue && !localStorage.getItem(newKey)) {
+                    const obfuscated = obfuscateValue(lsValue);
+                    localStorage.setItem(newKey, obfuscated);
+                    migrated.push(`✓ localStorage: ${oldKey} → ${newKey}`);
+                }
+                
+                // Migrate sessionStorage
+                const ssValue = sessionStorage.getItem(oldKey);
+                if (ssValue && !sessionStorage.getItem(newKey)) {
+                    const obfuscated = obfuscateValue(ssValue);
+                    sessionStorage.setItem(newKey, obfuscated);
+                    migrated.push(`✓ sessionStorage: ${oldKey} → ${newKey}`);
+                }
+                
+                // Migrate cookies
+                const cookies = document.cookie.split(';');
+                cookies.forEach(cookie => {
+                    const [name, val] = cookie.trim().split('=');
+                    if (name === oldKey && val) {
+                        const decodedValue = decodeURIComponent(val);
+                        const obfuscated = obfuscateValue(decodedValue);
+                        
+                        const expiryDate = new Date();
+                        expiryDate.setHours(expiryDate.getHours() + 24);
+                        document.cookie = `${newKey}=${encodeURIComponent(obfuscated)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+                        
+                        migrated.push(`✓ cookie: ${oldKey} → ${newKey}`);
+                    }
+                });
+            });
+            
+            if (migrated.length === 0) {
+                output.innerHTML = '<span class="success">✅ No migration needed - all keys already obfuscated!</span>';
+            } else {
+                output.innerHTML = '<span class="success">✅ Migration complete:</span>\n' + 
+                    migrated.map(m => `<span class="success">${m}</span>`).join('\n');
+            }
+        }
+
+        function cleanupOldKeys() {
+            const output = document.getElementById('migrationOutput');
+            let removed = [];
+            
+            Object.keys(KEY_MAP).forEach(oldKey => {
+                // Remove from localStorage
+                if (localStorage.getItem(oldKey)) {
+                    localStorage.removeItem(oldKey);
+                    removed.push(`✓ Removed from localStorage: ${oldKey}`);
+                }
+                
+                // Remove from sessionStorage
+                if (sessionStorage.getItem(oldKey)) {
+                    sessionStorage.removeItem(oldKey);
+                    removed.push(`✓ Removed from sessionStorage: ${oldKey}`);
+                }
+                
+                // Remove from cookies
+                document.cookie = `${oldKey}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+                removed.push(`✓ Removed from cookies: ${oldKey}`);
+            });
+            
+            output.innerHTML = '<span class="success">✅ Cleanup complete:</span>\n' + 
+                removed.map(r => `<span class="success">${r}</span>`).join('\n') +
+                '\n\n<span class="success">Refresh the page to verify!</span>';
+        }
+
+        function clearAll() {
+            if (!confirm('⚠️ This will clear ALL storage and log you out. Continue?')) {
+                return;
+            }
+            
+            const output = document.getElementById('clearOutput');
+            
+            // Clear localStorage
+            localStorage.clear();
+            
+            // Clear sessionStorage
+            sessionStorage.clear();
+            
+            // Clear all cookies
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const name = cookie.split('=')[0].trim();
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+            });
+            
+            // Clear IndexedDB
+            indexedDB.deleteDatabase('GalaxyKickLockDB');
+            
+            output.innerHTML = '<span class="success">✅ All storage cleared!</span>\n' +
+                '<span class="warning">Redirecting to home page in 2 seconds...</span>';
+            
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        }
+
+        // Auto-check on load
+        window.onload = () => {
+            checkObfuscation();
+        };
+    </script>
+</body>
+</html>

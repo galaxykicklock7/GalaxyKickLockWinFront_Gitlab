@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { loginUser } from '../utils/auth';
+import { storageManager } from '../utils/storageManager';
 import './Auth.css';
 
 function SignIn({ onSuccess, onSwitchToSignUp }) {
@@ -39,9 +40,9 @@ function SignIn({ onSuccess, onSwitchToSignUp }) {
       if (result.success) {
         // Store remember me preference
         if (rememberMe) {
-          localStorage.setItem('rememberedUsername', username.trim());
+          storageManager.setItem('rememberedUsername', username.trim());
         } else {
-          localStorage.removeItem('rememberedUsername');
+          storageManager.removeItem('rememberedUsername');
         }
         
         onSuccess(result.data);
@@ -58,7 +59,7 @@ function SignIn({ onSuccess, onSwitchToSignUp }) {
 
   // Load remembered username on mount
   useState(() => {
-    const remembered = localStorage.getItem('rememberedUsername');
+    const remembered = storageManager.getItem('rememberedUsername');
     if (remembered) {
       setUsername(remembered);
       setRememberMe(true);

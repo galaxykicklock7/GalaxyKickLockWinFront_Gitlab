@@ -56,6 +56,7 @@ function UserApp() {
   const [authenticated, setAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [storageReady, setStorageReady] = useState(false);
   const [toast, setToast] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [logoutWarningMessage, setLogoutWarningMessage] = useState('');
@@ -68,6 +69,16 @@ function UserApp() {
 
   // Stable ref to latest config — used by beforeunload to avoid re-registering the listener
   const configRef = useRef(null);
+  
+  // Initialize storage manager on mount
+  useEffect(() => {
+    const initStorage = async () => {
+      await storageManager.initialize();
+      setStorageReady(true);
+    };
+    
+    initStorage();
+  }, []);
 
   // Load config from storage or use defaults
   const getInitialConfig = () => {
@@ -213,7 +224,9 @@ function UserApp() {
     checkAuth();
 
     // Initialize connection manager on app startup
-    backendStorage.initializeConnectionManager();
+    backendStorage.initializeConnectionManager().catch(err => {
+      console.error('Failed to initialize connection manager:', err);
+    });
 
     // Generate unique tab ID for this tab (only once on mount)
     const tabId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -607,7 +620,7 @@ function UserApp() {
           const { getBackendUrl } = await import('./utils/backendUrl');
 
           if (!connectionManager.getUrl()) {
-            backendStorage.initializeConnectionManager();
+            await backendStorage.initializeConnectionManager();
           }
           const backendUrl = connectionManager.getUrl() || getBackendUrl();
 
@@ -716,7 +729,7 @@ function UserApp() {
       const { getBackendUrl } = await import('./utils/backendUrl');
 
       if (!connectionManager.getUrl()) {
-        backendStorage.initializeConnectionManager();
+        await backendStorage.initializeConnectionManager();
       }
       const backendUrl = connectionManager.getUrl() || getBackendUrl();
 
@@ -837,12 +850,13 @@ function UserApp() {
     }
   }, [config, status, sendCommand, showToast]);
 
-  // Show loading while checking authentication
-  if (checkingAuth) {
+  // Show loading while initializing storage or checking authentication
+  if (!storageReady || checkingAuth) {
     return (
       <div className="premium-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: '#00f3ff' }}>
         <div style={{ textAlign: 'center' }}>
-          <h2>INITIALIZING SYSTEM...</h2>
+          <h2>🔐 INITIALIZING SECURE STORAGE...</h2>
+          <p style={{ color: '#ffaa00', marginTop: '10px' }}>Decrypting your data...</p>
         </div>
       </div>
     );

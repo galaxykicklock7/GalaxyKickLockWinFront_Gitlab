@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import rateLimiter from './rateLimiter';
 import { validateUsername, validatePassword, detectSQLInjection } from './inputValidator';
+import { storageManager } from './storageManager';
 
 // Admin Registration
 export async function registerAdmin(username, password) {
@@ -95,7 +96,7 @@ export async function loginAdmin(username, password) {
         expires_at: data.expires_at,
         login_time: new Date().toISOString()
       };
-      localStorage.setItem('adminSession', JSON.stringify(adminSession));
+      storageManager.setItem('adminSession', JSON.stringify(adminSession));
       
       rateLimiter.reset('admin-login');
       return { success: true, data: adminSession };
@@ -110,12 +111,12 @@ export async function loginAdmin(username, password) {
 
 // Admin Logout
 export function logoutAdmin() {
-  localStorage.removeItem('adminSession');
+  storageManager.removeItem('adminSession');
 }
 
 // Get Admin Session
 export function getAdminSession() {
-  const sessionStr = localStorage.getItem('adminSession');
+  const sessionStr = storageManager.getItem('adminSession');
   if (!sessionStr) return null;
 
   try {

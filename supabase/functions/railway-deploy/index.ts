@@ -1,8 +1,8 @@
 // Supabase Edge Function: railway-deploy
 // Redeploys a user's Railway service and updates Supabase status
 //
-// POST body: { "user_id": "bharanitest" }
-// Required secrets: RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// POST body: ENCRYPTED { "user_id": "bharanitest" }
+// Required secrets: RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PAYLOAD_ENCRYPTION_KEY
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -14,6 +14,84 @@ const corsHeaders = {
 
 const RAILWAY_API = "https://backboard.railway.com/graphql/v2";
 
+// ============ ENCRYPTION/DECRYPTION ============
+const ENCRYPTION_KEY = Deno.env.get('PAYLOAD_ENCRYPTION_KEY') || '';
+let derivedKey: CryptoKey | null = null;
+
+async function getKey(): Promise<CryptoKey> {
+  if (derivedKey) return derivedKey;
+
+  if (!ENCRYPTION_KEY) {
+    throw new Error('PAYLOAD_ENCRYPTION_KEY not configured');
+  }
+
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(ENCRYPTION_KEY),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  derivedKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gkl-payload-v1'),
+      iterations: 1000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  return derivedKey;
+}
+
+async function decryptPayload(encrypted: string): Promise<any> {
+  const key = await getKey();
+  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    ciphertext
+  );
+
+  const decoder = new TextDecoder();
+  const decrypted = decoder.decode(plaintext);
+
+  try {
+    return JSON.parse(decrypted);
+  } catch {
+    return { error: decrypted, success: false };
+  }
+}
+
+async function encryptPayload(data: any): Promise<string> {
+  const key = await getKey();
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = encoder.encode(JSON.stringify(data));
+
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    plaintext
+  );
+
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+// ============ END ENCRYPTION ============
+
 async function railwayGQL(token: string, query: string, variables?: Record<string, unknown>) {
   const res = await fetch(RAILWAY_API, {
     method: "POST",
@@ -23,10 +101,13 @@ async function railwayGQL(token: string, query: string, variables?: Record<strin
     },
     body: JSON.stringify({ query, variables }),
   });
+
   const json = await res.json();
+
   if (json.errors) {
     throw new Error(json.errors.map((e: { message: string }) => e.message).join(", "));
   }
+
   return json.data;
 }
 
@@ -45,16 +126,24 @@ Deno.serve(async (req) => {
       throw new Error("Missing Railway configuration");
     }
 
-    const { user_id } = await req.json();
+    // DECRYPT the request body
+    const encryptedBody = await req.text();
+    const { user_id } = await decryptPayload(encryptedBody);
+
     if (!user_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: "user_id is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const errorResponse = await encryptPayload({
+        success: false,
+        error: "user_id is required"
+      });
+      return new Response(errorResponse, {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "text/plain" }
+      });
     }
 
     // Step 1: Look up user's railway_service_id from Supabase
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
+    
     const { data: deployment, error: dbError } = await supabase
       .from("user_deployments")
       .select("railway_service_id, backend_url")
@@ -62,18 +151,23 @@ Deno.serve(async (req) => {
       .single();
 
     if (dbError || !deployment?.railway_service_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: "No Railway service found for this user. Contact admin." }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const errorResponse = await encryptPayload({
+        success: false,
+        error: "No Railway service found for this user. Contact admin."
+      });
+      return new Response(errorResponse, {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "text/plain" }
+      });
     }
 
     const serviceId = deployment.railway_service_id;
     const backendUrl = deployment.backend_url;
 
     // Step 2: Get environment ID (production)
-    const projectData = await railwayGQL(RAILWAY_TOKEN, `
-      query($projectId: String!) {
+    const projectData = await railwayGQL(
+      RAILWAY_TOKEN,
+      `query($projectId: String!) {
         project(id: $projectId) {
           environments {
             edges {
@@ -81,20 +175,24 @@ Deno.serve(async (req) => {
             }
           }
         }
-      }
-    `, { projectId: RAILWAY_PROJECT_ID });
+      }`,
+      { projectId: RAILWAY_PROJECT_ID }
+    );
 
     const envEdge = projectData.project.environments.edges.find(
       (e: { node: { name: string } }) => e.node.name === "production"
     );
+
     if (!envEdge) {
       throw new Error("Production environment not found");
     }
+
     const environmentId = envEdge.node.id;
 
     // Step 3: Get latest deployment for the service
-    const deployData = await railwayGQL(RAILWAY_TOKEN, `
-      query($projectId: String!, $serviceId: String!, $environmentId: String!) {
+    const deployData = await railwayGQL(
+      RAILWAY_TOKEN,
+      `query($projectId: String!, $serviceId: String!, $environmentId: String!) {
         deployments(input: {
           projectId: $projectId,
           serviceId: $serviceId,
@@ -104,26 +202,29 @@ Deno.serve(async (req) => {
             node { id status }
           }
         }
-      }
-    `, { projectId: RAILWAY_PROJECT_ID, serviceId, environmentId });
+      }`,
+      { projectId: RAILWAY_PROJECT_ID, serviceId, environmentId }
+    );
 
     const latestDeploy = deployData.deployments.edges[0]?.node;
 
-    // Step 4: Redeploy — use deploymentRedeploy if there's an existing deployment,
-    // otherwise use serviceInstanceRedeploy
+    // Step 4: Redeploy
     if (latestDeploy) {
-      await railwayGQL(RAILWAY_TOKEN, `
-        mutation($deploymentId: String!) {
+      await railwayGQL(
+        RAILWAY_TOKEN,
+        `mutation($deploymentId: String!) {
           deploymentRedeploy(id: $deploymentId) { id status }
-        }
-      `, { deploymentId: latestDeploy.id });
+        }`,
+        { deploymentId: latestDeploy.id }
+      );
     } else {
-      // No previous deployment — trigger a fresh deploy using serviceInstanceRedeploy
-      await railwayGQL(RAILWAY_TOKEN, `
-        mutation($serviceId: String!, $environmentId: String!) {
+      await railwayGQL(
+        RAILWAY_TOKEN,
+        `mutation($serviceId: String!, $environmentId: String!) {
           serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId)
-        }
-      `, { serviceId, environmentId });
+        }`,
+        { serviceId, environmentId }
+      );
     }
 
     // Step 5: Update Supabase status to active
@@ -132,7 +233,7 @@ Deno.serve(async (req) => {
       .update({ status: "active", updated_at: new Date().toISOString() })
       .eq("user_id", user_id);
 
-    // Step 6: Health check — poll the backend URL until it responds
+    // Step 6: Health check
     let healthOk = false;
     if (backendUrl) {
       for (let i = 0; i < 30; i++) {
@@ -141,6 +242,7 @@ Deno.serve(async (req) => {
             method: "GET",
             signal: AbortSignal.timeout(8000),
           });
+          
           if (healthRes.ok) {
             healthOk = true;
             break;
@@ -152,19 +254,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        backend_url: backendUrl,
-        health: healthOk,
-        service_id: serviceId,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // ENCRYPT the response
+    const responseData = {
+      success: true,
+      backend_url: backendUrl,
+      health: healthOk,
+      service_id: serviceId,
+    };
+    
+    const encryptedResponse = await encryptPayload(responseData);
+    
+    return new Response(encryptedResponse, {
+      headers: { ...corsHeaders, "Content-Type": "text/plain" }
+    });
+
   } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: (error as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // ENCRYPT error responses too
+    const errorData = { success: false, error: (error as Error).message };
+    const encryptedError = await encryptPayload(errorData);
+    
+    return new Response(encryptedError, {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "text/plain" }
+    });
   }
 });

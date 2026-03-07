@@ -1,7 +1,46 @@
 import { supabase } from './supabase';
+import { encryptPayload, decryptPayload } from './payloadCrypto';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+/**
+ * Call a Supabase Edge Function with encrypted request/response
+ */
+async function callEncryptedEdgeFunction(functionName, body) {
+  const encrypted = await encryptPayload(body);
+
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/${functionName}`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'text/plain',
+      },
+      body: encrypted,
+    }
+  );
+
+  const responseText = await response.text();
+
+  let data;
+  try {
+    data = await decryptPayload(responseText);
+  } catch {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error('Invalid response');
+    }
+  }
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Operation failed');
+  }
+
+  return data;
+}
 
 // Generate Token
 export async function generateToken(durationMonths) {
@@ -289,61 +328,26 @@ export async function updateUserDeployment(userId, updates) {
   }
 }
 
-// Get live Railway service status via edge function (sends account_id, not raw token)
+// Get live Railway service status via edge function
 export async function getRailwayServiceStatus(railwayAccountId, serviceId) {
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/railway-status`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          railway_account_id: railwayAccountId,
-          service_id: serviceId,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to get service status');
-    }
-
+    const data = await callEncryptedEdgeFunction('railway-status', {
+      railway_account_id: railwayAccountId,
+      service_id: serviceId,
+    });
     return { success: true, status: data.status };
   } catch (error) {
-    console.error('Get Railway service status error:', error);
     return { success: false, error: error.message };
   }
 }
 
-// Provision a Railway service for a token (sends account_id, not raw token)
+// Provision a Railway service for a token
 export async function provisionRailwayService(railwayAccountId, serviceName) {
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/railway-provision`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          railway_account_id: railwayAccountId,
-          service_name: serviceName,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Provisioning failed');
-    }
-
+    const data = await callEncryptedEdgeFunction('railway-provision', {
+      railway_account_id: railwayAccountId,
+      service_name: serviceName,
+    });
     return {
       success: true,
       service_id: data.service_id,
@@ -351,7 +355,6 @@ export async function provisionRailwayService(railwayAccountId, serviceName) {
       backend_url: data.backend_url,
     };
   } catch (error) {
-    console.error('Provision Railway service error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -384,33 +387,15 @@ export async function saveServiceMapping(tokenId, serviceId, backendUrl, railway
   }
 }
 
-// Delete Railway service (sends account_id, not raw token)
+// Delete Railway service
 export async function deleteRailwayService(railwayAccountId, serviceId) {
   try {
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/railway-delete`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          railway_account_id: railwayAccountId,
-          service_id: serviceId,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to delete Railway service');
-    }
-
+    await callEncryptedEdgeFunction('railway-delete', {
+      railway_account_id: railwayAccountId,
+      service_id: serviceId,
+    });
     return { success: true };
   } catch (error) {
-    console.error('Delete Railway service error:', error);
     return { success: false, error: error.message };
   }
 }

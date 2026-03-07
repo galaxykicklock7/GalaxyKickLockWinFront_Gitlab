@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migrate to Full Encryption - Galaxy Kick Lock</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00f3ff;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00f3ff;
+            text-shadow: 0 0 10px #00f3ff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #ffaa00;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid #00f3ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #00f3ff;
+            color: #0a0e27;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #00d4e6;
+            box-shadow: 0 0 20px #00f3ff;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .success {
+            background: #00ff88;
+        }
+        .success:hover {
+            background: #00e67a;
+            box-shadow: 0 0 20px #00ff88;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .status {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffaa00;
+        }
+        .error {
+            color: #ff3366;
+        }
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00f3ff, #00ff88);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0a0e27;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 ENCRYPTION MIGRATION</h1>
+    <p class="subtitle">Upgrade all storage to AES-256-GCM encryption</p>
+    
+    <div class="section">
+        <h2>Current Status</h2>
+        <button onclick="scanStorage()">🔍 Scan Storage</button>
+        <pre id="scanOutput">Click "Scan Storage" to analyze...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Migration</h2>
+        <button id="migrateBtn" onclick="migrateAll()" class="success">🚀 Migrate All to AES-256</button>
+        <div class="progress" id="progressBar" style="display: none;">
+            <div class="progress-bar" id="progressFill">0%</div>
+        </div>
+        <pre id="migrateOutput">Ready to migrate...</pre>
+    </div>
+
+    <div class="section">
+        <h2>Actions</h2>
+        <button onclick="window.location.href='/'">← Back to App</button>
+        <button onclick="window.location.reload()">🔄 Refresh</button>
+    </div>
+
+    <script>
+        let encryptionKey = null;
+        
+        // Initialize encryption key
+        async function initEncryption() {
+            try {
+                const fingerprint = [
+                    navigator.userAgent,
+                    navigator.language,
+                    new Date().getTimezoneOffset(),
+                    screen.colorDepth,
+                    screen.width + 'x' + screen.height,
+                    navigator.hardwareConcurrency || 'unknown',
+                    navigator.deviceMemory || 'unknown',
+                    sessionStorage.getItem('_ek') || generateSalt()
+                ].join('|');
+                
+                const encoder = new TextEncoder();
+                const data = encoder.encode(fingerprint);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                
+                encryptionKey = await crypto.subtle.importKey(
+                    'raw',
+                    hashBuffer,
+                    { name: 'AES-GCM' },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+                
+                return true;
+            } catch (e) {
+                console.error('Encryption init failed:', e);
+                return false;
+            }
+        }
+        
+        function generateSalt() {
+            const salt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                .map(b => b.toString(36)).join('');
+            sessionStorage.setItem('_ek', salt);
+            return salt;
+        }
+        
+        async function encryptValue(value) {
+            if (!encryptionKey) {
+                await initEncryption();
+            }
+            
+            if (!encryptionKey) {
+                throw new Error('Encryption not available');
+            }
+            
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(value);
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                
+                const encrypted = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv },
+                    encryptionKey,
+                    data
+                );
+                
+                const combined = new Uint8Array(iv.length + encrypted.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(encrypted), iv.length);
+                
+                return '_enc_' + btoa(String.fromCharCode(...combined));
+            } catch (e) {
+                throw new Error('Encryption failed: ' + e.message);
+            }
+        }
+        
+        function deobfuscateValue(value) {
+            try {
+                if (value && value.startsWith('_ob_')) {
+                    return decodeURIComponent(escape(atob(value.substring(4))));
+                }
+                return value;
+            } catch (e) {
+                return value;
+            }
+        }
+        
+        async function scanStorage() {
+            const output = document.getElementById('scanOutput');
+            let html = '<span class="status">📊 SCANNING ALL STORAGE...</span>\n\n';
+            
+            let totalItems = 0;
+            let encryptedItems = 0;
+            let obfuscatedItems = 0;
+            let plainItems = 0;
+            
+            const itemsToMigrate = [];
+            
+            // Scan localStorage
+            html += '<span class="status">📦 LOCAL STORAGE:</span>\n';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                totalItems++;
+                
+                if (value.startsWith('_enc_')) {
+                    encryptedItems++;
+                    html += `<span class="status">✓ ${key}</span>: AES-256 encrypted\n`;
+                } else if (value.startsWith('_ob_')) {
+                    obfuscatedItems++;
+                    html += `<span class="warning">⚠ ${key}</span>: Base64 only (needs upgrade)\n`;
+                    itemsToMigrate.push({ storage: 'localStorage', key, value });
+                } else {
+                    plainItems++;
+                    html += `<span class="error">✗ ${key}</span>: Plain text (needs encryption)\n`;
+                    itemsToMigrate.push({ storage: 'localStorage', key, value });
+                }
+            }
+            
+            // Scan sessionStorage
+            html += '\n<span class="status">💾 SESSION STORAGE:</span>\n';
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key === '_ek') continue; // Skip encryption key
+                
+                const value = sessionStorage.getItem(key);
+                totalItems++;
+                
+                if (value.startsWith('_enc_')) {
+                    encryptedItems++;
+                    html += `<span class="status">✓ ${key}</span>: AES-256 encrypted\n`;
+                } else if (value.startsWith('_ob_')) {
+                    obfuscatedItems++;
+                    html += `<span class="warning">⚠ ${key}</span>: Base64 only (needs upgrade)\n`;
+                    itemsToMigrate.push({ storage: 'sessionStorage', key, value });
+                } else {
+                    plainItems++;
+                    html += `<span class="error">✗ ${key}</span>: Plain text (needs encryption)\n`;
+                    itemsToMigrate.push({ storage: 'sessionStorage', key, value });
+                }
+            }
+            
+            // Scan cookies
+            html += '\n<span class="status">🍪 COOKIES:</span>\n';
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const [name, val] = cookie.trim().split('=');
+                if (!name || !val) return;
+                
+                const value = decodeURIComponent(val);
+                totalItems++;
+                
+                if (value.startsWith('_enc_')) {
+                    encryptedItems++;
+                    html += `<span class="status">✓ ${name}</span>: AES-256 encrypted\n`;
+                } else if (value.startsWith('_ob_')) {
+                    obfuscatedItems++;
+                    html += `<span class="warning">⚠ ${name}</span>: Base64 only (needs upgrade)\n`;
+                    itemsToMigrate.push({ storage: 'cookie', key: name, value });
+                } else {
+                    plainItems++;
+                    html += `<span class="error">✗ ${name}</span>: Plain text (needs encryption)\n`;
+                    itemsToMigrate.push({ storage: 'cookie', key: name, value });
+                }
+            });
+            
+            // Summary
+            html += '\n<span class="status">═══════════════════════════════</span>\n';
+            html += `<span class="status">Total Items: ${totalItems}</span>\n`;
+            html += `<span class="status">✓ Encrypted (AES-256): ${encryptedItems}</span>\n`;
+            html += `<span class="warning">⚠ Obfuscated (Base64): ${obfuscatedItems}</span>\n`;
+            html += `<span class="error">✗ Plain Text: ${plainItems}</span>\n`;
+            html += `<span class="warning">Items to Migrate: ${itemsToMigrate.length}</span>\n`;
+            
+            output.innerHTML = html;
+            
+            // Store items to migrate
+            window.itemsToMigrate = itemsToMigrate;
+            
+            // Enable/disable migrate button
+            const migrateBtn = document.getElementById('migrateBtn');
+            if (itemsToMigrate.length > 0) {
+                migrateBtn.disabled = false;
+                migrateBtn.textContent = `🚀 Migrate ${itemsToMigrate.length} Items to AES-256`;
+            } else {
+                migrateBtn.disabled = true;
+                migrateBtn.textContent = '✓ All Items Already Encrypted';
+            }
+        }
+        
+        async function migrateAll() {
+            const output = document.getElementById('migrateOutput');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const migrateBtn = document.getElementById('migrateBtn');
+            
+            if (!window.itemsToMigrate || window.itemsToMigrate.length === 0) {
+                output.innerHTML = '<span class="status">✓ Nothing to migrate!</span>';
+                return;
+            }
+            
+            migrateBtn.disabled = true;
+            progressBar.style.display = 'block';
+            
+            let html = '<span class="status">🚀 STARTING MIGRATION...</span>\n\n';
+            output.innerHTML = html;
+            
+            const items = window.itemsToMigrate;
+            let migrated = 0;
+            let failed = 0;
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const progress = Math.round(((i + 1) / items.length) * 100);
+                progressFill.style.width = progress + '%';
+                progressFill.textContent = progress + '%';
+                
+                try {
+                    // Decode if base64
+                    let plainValue = item.value;
+                    if (plainValue.startsWith('_ob_')) {
+                        plainValue = deobfuscateValue(plainValue);
+                    }
+                    
+                    // Encrypt with AES-256
+                    const encrypted = await encryptValue(plainValue);
+                    
+                    // Store back
+                    if (item.storage === 'localStorage') {
+                        localStorage.setItem(item.key, encrypted);
+                    } else if (item.storage === 'sessionStorage') {
+                        sessionStorage.setItem(item.key, encrypted);
+                    } else if (item.storage === 'cookie') {
+                        const expiryDate = new Date();
+                        expiryDate.setHours(expiryDate.getHours() + 24);
+                        document.cookie = `${item.key}=${encodeURIComponent(encrypted)}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+                    }
+                    
+                    migrated++;
+                    html += `<span class="status">✓ Migrated ${item.storage}: ${item.key}</span>\n`;
+                } catch (e) {
+                    failed++;
+                    html += `<span class="error">✗ Failed ${item.storage}: ${item.key} - ${e.message}</span>\n`;
+                }
+                
+                output.innerHTML = html;
+                
+                // Small delay to show progress
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            html += '\n<span class="status">═══════════════════════════════</span>\n';
+            html += `<span class="status">✓ Migration Complete!</span>\n`;
+            html += `<span class="status">Migrated: ${migrated}</span>\n`;
+            if (failed > 0) {
+                html += `<span class="error">Failed: ${failed}</span>\n`;
+            }
+            html += '\n<span class="warning">Refresh the page to verify!</span>\n';
+            
+            output.innerHTML = html;
+            
+            progressFill.style.width = '100%';
+            progressFill.textContent = '100% Complete!';
+            
+            // Re-scan after 2 seconds
+            setTimeout(() => {
+                scanStorage();
+            }, 2000);
+        }
+        
+        // Auto-scan on load
+        window.onload = async () => {
+            await initEncryption();
+            scanStorage();
+        };
+    </script>
+</body>
+</html>

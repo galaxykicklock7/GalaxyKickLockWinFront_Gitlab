@@ -1,10 +1,12 @@
 /**
  * Backend Connection Manager
  *
- * Manages a single Railway backend URL with lightweight health tracking:
+ * Manages a single backend URL with lightweight health tracking:
  *   - Records success/failure from real API traffic
  *   - Schedules recovery probes only when backend is unhealthy
  */
+
+import { securityManager } from './securityManager';
 
 class ConnectionManager {
   constructor() {
@@ -34,7 +36,7 @@ class ConnectionManager {
       failureCount: 0,
       responseTime: 0,
     };
-    console.log(`Backend URL set: ${url}`);
+    securityManager.safeLog('log', 'Service endpoint configured');
     return true;
   }
 
@@ -57,7 +59,7 @@ class ConnectionManager {
     this.backend.status = 'HEALTHY';
 
     if (wasUnhealthy) {
-      console.log(`Backend recovered: ${url}`);
+      securityManager.safeLog('log', 'Service recovered');
       this._cancelRecovery();
     }
   }
@@ -70,12 +72,12 @@ class ConnectionManager {
     if (this.backend.failureCount >= this.FAILURE_THRESHOLD) {
       if (this.backend.status !== 'OFFLINE') {
         this.backend.status = 'OFFLINE';
-        console.warn(`Backend OFFLINE: ${url}`);
+        securityManager.safeLog('warn', 'Service offline');
         this._scheduleRecovery();
       }
     } else if (this.backend.status === 'HEALTHY') {
       this.backend.status = 'DEGRADED';
-      console.warn(`Backend DEGRADED: ${url} (${this.backend.failureCount}/${this.FAILURE_THRESHOLD})`);
+      securityManager.safeLog('warn', `Service degraded (${this.backend.failureCount}/${this.FAILURE_THRESHOLD})`);
       this._scheduleRecovery();
     }
   }
@@ -109,6 +111,12 @@ class ConnectionManager {
         const res = await fetch(`${this.backend.url}/api/health`, {
           method: 'GET',
           signal: AbortSignal.timeout(8000),
+        }).catch(err => {
+          // Ignore abort errors - treat as timeout
+          if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+            return { ok: false, status: 408 };
+          }
+          throw err;
         });
         const rt = Date.now() - start;
 
@@ -118,8 +126,13 @@ class ConnectionManager {
           this.recordFailure(this.backend.url, `HTTP ${res.status}`);
           this._scheduleRecovery();
         }
-      } catch {
-        this.recordFailure(this.backend.url, 'probe-timeout');
+      } catch (err) {
+        // Silently handle abort errors
+        if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+          this.recordFailure(this.backend.url, 'probe-timeout');
+        } else {
+          this.recordFailure(this.backend.url, 'probe-error');
+        }
         this._scheduleRecovery();
       }
     }, this.RECOVERY_POLL_MS);
@@ -140,7 +153,7 @@ class ConnectionManager {
 
   _handleOnline() {
     if (this.backend && this.backend.status !== 'HEALTHY') {
-      console.log('Browser back online — probing backend');
+      securityManager.safeLog('log', 'Browser back online');
       this._scheduleRecovery();
     }
   }

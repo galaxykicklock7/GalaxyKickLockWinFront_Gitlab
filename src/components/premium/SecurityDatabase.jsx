@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FaDatabase, FaShieldAlt, FaBan } from 'react-icons/fa';
+import { storageManager } from '../../utils/storageManager';
 import './PremiumLayout.css';
 
 const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
@@ -13,7 +14,7 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
     useEffect(() => {
         const updateUsername = () => {
             try {
-                const session = JSON.parse(localStorage.getItem('galaxyKickLockSession') || '{}');
+                const session = JSON.parse(storageManager.getItem('galaxyKickLockSession') || '{}');
                 currentUsernameRef.current = session.username?.toLowerCase() || null;
             } catch {
                 currentUsernameRef.current = null;
