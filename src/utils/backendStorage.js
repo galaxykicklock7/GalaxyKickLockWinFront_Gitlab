@@ -1,16 +1,16 @@
 /**
  * Backend URL Storage Utility
  *
- * Simplified from multi-tunnel array to single Railway URL.
+ * Stores and retrieves the Railway backend URL from localStorage.
  * Coordinates with ConnectionManager for seamless URL management.
  */
 
 import { storageManager } from './storageManager';
-import { tunnelManager } from './tunnelManager';
+import { connectionManager } from './connectionManager';
 
 const BACKEND_URL_KEY = 'railwayBackendUrl';
 
-export const tunnelStorage = {
+export const backendStorage = {
   /**
    * Save the Railway backend URL
    * @param {string} url - Railway backend URL
@@ -19,7 +19,7 @@ export const tunnelStorage = {
   saveBackendUrl(url) {
     if (!url || typeof url !== 'string') return false;
     storageManager.setItem(BACKEND_URL_KEY, url);
-    tunnelManager.setUrl(url);
+    connectionManager.setUrl(url);
     console.log(`Backend URL saved: ${url}`);
     return true;
   },
@@ -36,7 +36,7 @@ export const tunnelStorage = {
    * Initialize connection manager from storage on app load
    * Only loads if deployment is currently active
    */
-  initializeTunnelManager() {
+  initializeConnectionManager() {
     const deploymentStatus = storageManager.getItem('deploymentStatus');
 
     if (deploymentStatus !== 'deployed') {
@@ -50,15 +50,15 @@ export const tunnelStorage = {
       return;
     }
 
-    tunnelManager.setUrl(url);
+    connectionManager.setUrl(url);
     console.log(`Connection manager initialized with: ${url}`);
   },
 
   /**
    * Clear backend URL from storage and connection manager
    */
-  clearAllTunnels() {
-    tunnelManager.clear();
+  clearBackendUrl() {
+    connectionManager.clear();
     storageManager.removeItem(BACKEND_URL_KEY);
     console.log('Backend URL cleared from storage and manager');
   },
@@ -67,8 +67,8 @@ export const tunnelStorage = {
    * Get backend status summary
    * @returns {object}
    */
-  getTunnelStatusSummary() {
-    const statuses = tunnelManager.getTunnelStatus();
+  getStatusSummary() {
+    const statuses = connectionManager.getStatus();
     const healthy = statuses.filter(t => t.status === 'HEALTHY').length;
     const degraded = statuses.filter(t => t.status === 'DEGRADED').length;
     const offline = statuses.filter(t => t.status === 'OFFLINE').length;
@@ -78,17 +78,9 @@ export const tunnelStorage = {
       healthy,
       degraded,
       offline,
-      tunnels: statuses
+      backends: statuses
     };
   },
-
-  // Legacy compat shims (used by CommandBar / api.js)
-  addTunnel(url) { return this.saveBackendUrl(url); },
-  removeTunnel() { this.clearAllTunnels(); return true; },
-  saveTunnels() {},
-  loadTunnels() { const u = this.loadBackendUrl(); return u ? [u] : []; },
-  setActiveTunnel() {},
-  getActiveTunnel() { return this.loadBackendUrl(); },
 };
 
-export default tunnelStorage;
+export default backendStorage;

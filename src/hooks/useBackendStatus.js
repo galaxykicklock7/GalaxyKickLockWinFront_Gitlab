@@ -100,7 +100,7 @@ export const useBackendStatus = () => {
       fetchStatus();
       fetchLogs();
 
-      // Poll every 2 seconds; skip when tab is hidden to save CPU + tunnel quota
+      // Poll every 2 seconds; skip when tab is hidden to save CPU
       pollingIntervalRef.current = setInterval(() => {
         if (document.hidden) return;
         if (storageManager.getItem('deploymentStatus') === 'deployed') {

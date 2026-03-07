@@ -1,16 +1,16 @@
 import axios from 'axios';
 import { getBackendUrl } from './backendUrl';
-import { tunnelManager } from './tunnelManager';
-import { tunnelStorage } from './tunnelStorage';
+import { connectionManager } from './connectionManager';
+import { backendStorage } from './backendStorage';
 
 // Restore backend URL from localStorage so the first API call uses the correct URL.
-tunnelStorage.initializeTunnelManager();
+backendStorage.initializeConnectionManager();
 
 /**
  * Returns the current backend URL — from connection manager or plain backendUrl.
  */
 export const getBestUrl = () => {
-  const managed = tunnelManager.getUrl();
+  const managed = connectionManager.getUrl();
   return managed || getBackendUrl();
 };
 
@@ -41,12 +41,12 @@ const createApiInstance = () => {
         response.config.retryCount = 0;
         const startTime = response.config.startTime || Date.now();
         const responseTime = Date.now() - startTime;
-        tunnelManager.recordSuccess(baseURL, responseTime);
+        connectionManager.recordSuccess(baseURL, responseTime);
       }
       return response;
     },
     async (error) => {
-      tunnelManager.recordFailure(baseURL, error.code || error.message);
+      connectionManager.recordFailure(baseURL, error.code || error.message);
 
       const isRetryable =
         error.code === 'ECONNABORTED' ||

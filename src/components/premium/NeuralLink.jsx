@@ -58,7 +58,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
         };
     }, []);
 
-    // ✅ FIX: Retry wrapper for tunnel-sensitive fetch calls
+    // Retry wrapper for fetch calls
     const fetchWithRetry = async (url, options = {}, maxRetries = 3) => {
         let lastError;
 
@@ -74,7 +74,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
                 });
 
                 if (!response.ok) {
-                    // Retry on 503/504 (tunnel issues)
+                    // Retry on 503/504
                     if (response.status === 503 || response.status === 504) {
                         throw new Error(`Server error ${response.status} - retryable`);
                     }
@@ -87,10 +87,10 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
 
                 if (attempt < maxRetries) {
                     const delayMs = 500 * attempt;  // Exponential: 500ms, 1000ms, 1500ms
-                    console.log(`🔄 [TUNNEL] Fetch retry ${attempt}/${maxRetries} after ${delayMs}ms for ${url}`);
+                    console.log(`🔄 [RETRY] Fetch retry ${attempt}/${maxRetries} after ${delayMs}ms for ${url}`);
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 } else {
-                    console.error(`❌ [TUNNEL] Fetch failed after ${maxRetries} retries:`, error);
+                    console.error(`❌ [RETRY] Fetch failed after ${maxRetries} retries:`, error);
                 }
             }
         }
@@ -202,7 +202,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
                 : `${backendUrl}/api/ai/chat/disable/${connNum}`;
 
 
-            // ✅ FIX: Use fetchWithRetry for tunnel stability
+            // Use fetchWithRetry for stability
             const response = await fetchWithRetry(endpoint, {
                 method: 'POST',
                 headers: {

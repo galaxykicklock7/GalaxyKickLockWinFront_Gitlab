@@ -37,7 +37,7 @@ export const useWorkflowMonitor = (showToast) => {
     try {
       const res = await fetch(`${backendUrl}/api/health`, {
         method: 'GET',
-        headers: { 'bypass-tunnel-reminder': 'true' },
+        headers: {},
         signal: AbortSignal.timeout(10000)
       });
 

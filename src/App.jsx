@@ -5,7 +5,7 @@ import { useWorkflowMonitor } from './hooks/useWorkflowMonitor';
 import { isAuthenticated, logoutUser, getSession } from './utils/auth';
 import { isAdminAuthenticated } from './utils/adminAuth';
 import { storageManager } from './utils/storageManager';
-import { tunnelStorage } from './utils/tunnelStorage';
+import { backendStorage } from './utils/backendStorage';
 import LandingPage from './pages/LandingPage';
 import AdminLandingPage from './pages/AdminLandingPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -212,8 +212,8 @@ function UserApp() {
 
     checkAuth();
 
-    // Initialize tunnel manager on app startup
-    tunnelStorage.initializeTunnelManager();
+    // Initialize connection manager on app startup
+    backendStorage.initializeConnectionManager();
 
     // Generate unique tab ID for this tab (only once on mount)
     const tabId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -603,13 +603,13 @@ function UserApp() {
       // If AI Core was restored from localStorage, re-send enable commands to backend
       if (aiCoreEnabled) {
         try {
-          const { tunnelManager } = await import('./utils/tunnelManager');
+          const { connectionManager } = await import('./utils/connectionManager');
           const { getBackendUrl } = await import('./utils/backendUrl');
 
-          if (!tunnelManager.getUrl()) {
-            tunnelStorage.initializeTunnelManager();
+          if (!connectionManager.getUrl()) {
+            backendStorage.initializeConnectionManager();
           }
-          const backendUrl = tunnelManager.getUrl() || getBackendUrl();
+          const backendUrl = connectionManager.getUrl() || getBackendUrl();
 
           if (backendUrl) {
             const aiPromises = [];
@@ -626,16 +626,16 @@ function UserApp() {
                   })
                     .then(response => {
                       if (!response.ok) {
-                        tunnelManager.recordFailure(backendUrl, `HTTP ${response.status}`);
+                        connectionManager.recordFailure(backendUrl, `HTTP ${response.status}`);
                         console.warn(`⚠️ AI enable ${i}: HTTP ${response.status}`);
                         // Don't throw, continue
                         return null;
                       }
-                      tunnelManager.recordSuccess(backendUrl, 100);
+                      connectionManager.recordSuccess(backendUrl, 100);
                       return response;
                     })
                     .catch(error => {
-                      tunnelManager.recordFailure(backendUrl, error.message);
+                      connectionManager.recordFailure(backendUrl, error.message);
                       console.warn(`⚠️ AI enable ${i} failed:`, error.message);
                       return null;
                     })
@@ -712,13 +712,13 @@ function UserApp() {
     setAiCoreEnabled(newState);
     
     try {
-      const { tunnelManager } = await import('./utils/tunnelManager');
+      const { connectionManager } = await import('./utils/connectionManager');
       const { getBackendUrl } = await import('./utils/backendUrl');
 
-      if (!tunnelManager.getUrl()) {
-        tunnelStorage.initializeTunnelManager();
+      if (!connectionManager.getUrl()) {
+        backendStorage.initializeConnectionManager();
       }
-      const backendUrl = tunnelManager.getUrl() || getBackendUrl();
+      const backendUrl = connectionManager.getUrl() || getBackendUrl();
 
       if (!backendUrl) {
         showToast('Backend not connected', 'error');

@@ -3,7 +3,7 @@ import { FaAndroid, FaApple, FaGlobe, FaSignOutAlt, FaRocket, FaWifi, FaCloudUpl
 import { activateBackend, deactivateBackend } from '../../utils/gitlab';
 import { setBackendUrl, clearBackendUrl } from '../../utils/backendUrl';
 import { storageManager } from '../../utils/storageManager';
-import { tunnelStorage } from '../../utils/tunnelStorage';
+import { backendStorage } from '../../utils/backendStorage';
 import DeploymentModal from '../DeploymentModal';
 import ConfirmModal from '../ConfirmModal';
 import ProfileModal from '../ProfileModal';
@@ -120,7 +120,7 @@ const CommandBar = ({
             }
 
             // Clear old backend URL
-            tunnelStorage.clearAllTunnels();
+            backendStorage.clearBackendUrl();
 
             // Step 1: Call Edge Function to redeploy Railway (0% → 80%)
             setDeploymentProgress({ percentage: 10, message: 'Deploying backend to Railway...' });
@@ -150,7 +150,7 @@ const CommandBar = ({
                     try {
                         const healthRes = await fetch(`${backendUrl}/api/health`, {
                             method: 'GET',
-                            headers: { 'bypass-tunnel-reminder': 'true' },
+                            headers: {},
                             signal: AbortSignal.timeout(10000)
                         });
                         if (healthRes.ok) {
@@ -177,7 +177,7 @@ const CommandBar = ({
 
             // Save URL and finalize
             setBackendUrl(backendUrl);
-            tunnelStorage.saveBackendUrl(backendUrl);
+            backendStorage.saveBackendUrl(backendUrl);
             storageManager.setItem('deploymentStatus', 'deployed');
             storageManager.setItem('userId', userId);
 
@@ -204,7 +204,7 @@ const CommandBar = ({
                 message: error.message || 'Deployment failed. Please try again.'
             });
             clearBackendUrl();
-            tunnelStorage.clearAllTunnels();
+            backendStorage.clearBackendUrl();
             storageManager.removeItem('deploymentStatus');
             storageManager.removeItem('userId');
         } finally {
@@ -287,7 +287,7 @@ const CommandBar = ({
 
             // Reset all state
             clearBackendUrl();
-            tunnelStorage.clearAllTunnels();
+            backendStorage.clearBackendUrl();
             storageManager.removeItem('deploymentStatus');
             storageManager.removeItem('userId');
             setDeploymentStatus('idle');
@@ -306,7 +306,7 @@ const CommandBar = ({
             setIsDeactivating(false);
             setIsDeploying(false);
             clearBackendUrl();
-            tunnelStorage.clearAllTunnels();
+            backendStorage.clearBackendUrl();
             storageManager.removeItem('deploymentStatus');
             storageManager.removeItem('userId');
             setDeploymentProgress({

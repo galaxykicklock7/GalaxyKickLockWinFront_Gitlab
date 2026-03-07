@@ -1,10 +1,7 @@
 /**
  * Backend Connection Manager
  *
- * Simplified from multi-tunnel failover to single Railway URL.
- * Railway provides a stable, persistent HTTPS URL — no tunnel rotation needed.
- *
- * Keeps lightweight health tracking for the single backend URL:
+ * Manages a single Railway backend URL with lightweight health tracking:
  *   - Records success/failure from real API traffic
  *   - Schedules recovery probes only when backend is unhealthy
  */
@@ -45,10 +42,10 @@ class ConnectionManager {
     return this.backend?.url || null;
   }
 
-  getHealthyTunnel() {
-    // Compat shim — returns object with .url like old tunnel manager
-    if (!this.backend) return null;
-    return this.backend;
+  getStatus() {
+    if (!this.backend) return [];
+    const { url, status, failureCount, responseTime } = this.backend;
+    return [{ url, status, failureCount, responseTime }];
   }
 
   recordSuccess(url, responseTime) {
@@ -83,24 +80,12 @@ class ConnectionManager {
     }
   }
 
-  getTunnelStatus() {
-    if (!this.backend) return [];
-    const { url, status, failureCount, responseTime } = this.backend;
-    return [{ url, status, failureCount, responseTime }];
-  }
-
   clear() {
     this._cancelRecovery();
     this.backend = null;
     document.removeEventListener('visibilitychange', this._onVisibilityChange);
     window.removeEventListener('online', this._onOnline);
   }
-
-  // Legacy-compat stubs
-  addTunnel(url) { return this.setUrl(url); }
-  removeTunnel() { this.clear(); return true; }
-  startHealthChecks() {}
-  stopHealthChecks() { this._cancelRecovery(); }
 
   // ─────────────────────────────────────────────
   //  PRIVATE — Recovery
@@ -162,5 +147,5 @@ class ConnectionManager {
 }
 
 // Singleton
-export const tunnelManager = new ConnectionManager();
+export const connectionManager = new ConnectionManager();
 export default ConnectionManager;
