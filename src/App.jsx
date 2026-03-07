@@ -324,10 +324,7 @@ function UserApp() {
           // Clear local state
           storageManager.removeItem('deploymentStatus');
           storageManager.removeItem('pipelineId');
-          storageManager.removeItem('backendSubdomain');
-          storageManager.removeItem('localTestMode');
-
-          const { clearBackendUrl } = await import('./utils/backendUrl');
+                    const { clearBackendUrl } = await import('./utils/backendUrl');
           clearBackendUrl();
 
           stopMonitoring();
@@ -440,8 +437,6 @@ function UserApp() {
       // 4. Clear local state
       storageManager.removeItem('deploymentStatus');
       storageManager.removeItem('pipelineId');
-      storageManager.removeItem('backendSubdomain');
-      storageManager.removeItem('localTestMode');
 
       const { clearBackendUrl } = await import('./utils/backendUrl');
       clearBackendUrl();
@@ -611,12 +606,10 @@ function UserApp() {
           const { tunnelManager } = await import('./utils/tunnelManager');
           const { getBackendUrl } = await import('./utils/backendUrl');
 
-          // ✅ Ensure tunnels loaded before checking
-          if (tunnelManager.tunnels.length === 0) {
+          if (!tunnelManager.getUrl()) {
             tunnelStorage.initializeTunnelManager();
           }
-          const healthyTunnel = tunnelManager.getHealthyTunnel();
-          const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
+          const backendUrl = tunnelManager.getUrl() || getBackendUrl();
 
           if (backendUrl) {
             const aiPromises = [];
@@ -629,9 +622,7 @@ function UserApp() {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'bypass-tunnel-reminder': 'true'
-                    },
-                    credentials: 'include'
+                    }
                   })
                     .then(response => {
                       if (!response.ok) {
@@ -724,12 +715,10 @@ function UserApp() {
       const { tunnelManager } = await import('./utils/tunnelManager');
       const { getBackendUrl } = await import('./utils/backendUrl');
 
-      // ✅ Always prefer a healthy tunnel over the raw main URL
-      if (tunnelManager.tunnels.length === 0) {
+      if (!tunnelManager.getUrl()) {
         tunnelStorage.initializeTunnelManager();
       }
-      const healthyTunnel = tunnelManager.getHealthyTunnel();
-      const backendUrl = healthyTunnel ? healthyTunnel.url : getBackendUrl();
+      const backendUrl = tunnelManager.getUrl() || getBackendUrl();
 
       if (!backendUrl) {
         showToast('Backend not connected', 'error');
@@ -756,7 +745,6 @@ function UserApp() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'bypass-tunnel-reminder': 'true'
               }
             }).then(r => ({ connection: i, ok: r.ok, response: r }))
           );

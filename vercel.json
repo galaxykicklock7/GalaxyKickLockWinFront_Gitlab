@@ -34,7 +34,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://localhost:3000 http://localhost:5173 https://*.supabase.co https://*.loca.lt https://*.vercel.app https://gitlab.com wss://*.loca.lt; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://localhost:3000 http://localhost:5173 https://*.supabase.co https://*.loca.lt https://*.vercel.app https://*.railway.app wss://*.loca.lt; frame-ancestors 'none';"
         }
       ]
     }

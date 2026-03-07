@@ -16,11 +16,7 @@ const TimerStatusIndicator = ({ wsNumber, backendUrl, userId }) => {
     const fetchTimerStatus = async () => {
       try {
         // Fetch in-memory timer status
-        const statusResponse = await fetch(`${backendUrl}/api/timer-status/${wsNumber}`, {
-          headers: {
-            'bypass-tunnel-reminder': 'true'
-          }
-        });
+        const statusResponse = await fetch(`${backendUrl}/api/timer-status/${wsNumber}`);
         
         let memoryStatus = 'normal';
         if (statusResponse.ok) {
@@ -34,7 +30,6 @@ const TimerStatusIndicator = ({ wsNumber, backendUrl, userId }) => {
         // Fetch database-based stuck detection
         const stuckResponse = await fetch(`${backendUrl}/api/check-stuck-at-max/${wsNumber}`, {
           headers: {
-            'bypass-tunnel-reminder': 'true',
             'x-user-id': userId
           }
         });

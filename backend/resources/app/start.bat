@@ -1,0 +1,3 @@
+@echo off
+echo Starting G.O.A.T Backend Server...
+node main.js

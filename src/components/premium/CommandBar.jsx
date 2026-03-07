@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaAndroid, FaApple, FaGlobe, FaSignOutAlt, FaRocket, FaWifi, FaCloudUploadAlt, FaTimesCircle, FaQuestionCircle } from 'react-icons/fa';
-import { triggerGitLabPipeline, pollGitLabPipelineUntilRunning, cancelGitLabPipeline, getLatestRunningGitLabPipeline } from '../../utils/gitlab';
+import { activateBackend, deactivateBackend } from '../../utils/gitlab';
 import { setBackendUrl, clearBackendUrl } from '../../utils/backendUrl';
 import { storageManager } from '../../utils/storageManager';
 import { tunnelStorage } from '../../utils/tunnelStorage';
@@ -27,7 +27,6 @@ const CommandBar = ({
     const [deploymentProgress, setDeploymentProgress] = useState({ percentage: 0, message: '' });
     const [isDeploying, setIsDeploying] = useState(false);
     const [showDeployModal, setShowDeployModal] = useState(false);
-    const [currentRunId, setCurrentRunId] = useState(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [confirmModalConfig, setConfirmModalConfig] = useState({});
     const [isDeactivating, setIsDeactivating] = useState(false);
@@ -38,16 +37,13 @@ const CommandBar = ({
     // Check if deployment is already done (persisted in storage)
     useEffect(() => {
         const savedDeploymentStatus = storageManager.getItem('deploymentStatus');
-        const savedPipelineId = storageManager.getItem('pipelineId');
-        
-        // Clean up any old localTestMode settings
+
+        // Clean up any old settings
         storageManager.removeItem('localTestMode');
-        
+        storageManager.removeItem('pipelineId');
+
         if (savedDeploymentStatus === 'deployed') {
             setDeploymentStatus('deployed');
-            if (savedPipelineId) {
-                setCurrentRunId(parseInt(savedPipelineId));
-            }
         }
     }, []);
 
@@ -57,7 +53,6 @@ const CommandBar = ({
             if (e.detail.status === 'idle') {
                 // Deployment stopped - reset to idle state
                 setDeploymentStatus('idle');
-                setCurrentRunId(null);
                 setIsDeploying(false);
                 setShowDeployModal(false);
             }
@@ -93,149 +88,125 @@ const CommandBar = ({
     };
 
     const handleDeploy = async () => {
-        // CRITICAL: Check if user already has a running pipeline
-        try {
-            setDeploymentProgress({ percentage: 0, message: 'Checking for existing sessions...' });
-            const existingPipelineId = await getLatestRunningGitLabPipeline();
-            
-            if (existingPipelineId) {
-                // User has a running pipeline - show confirmation modal
-                setConfirmModalConfig({
-                    title: '⚠️ SYSTEM ALREADY ACTIVE',
-                    message: 'You already have an active session running.\n\nStarting a new session will stop the current one.\n\nContinue?',
-                    confirmText: 'START NEW SESSION',
-                    type: 'warning',
-                    onConfirm: () => {
-                        setShowConfirmModal(false);
-                        performDeploy(existingPipelineId);
-                    }
-                });
-                setShowConfirmModal(true);
-                return;
-            }
-        } catch (error) {
-            console.warn('Failed to check for existing pipelines:', error);
-            // Continue anyway - better to deploy than block user
+        // If already deployed, confirm before redeploying
+        if (deploymentStatus === 'deployed') {
+            setConfirmModalConfig({
+                title: '⚠️ SYSTEM ALREADY ACTIVE',
+                message: 'You already have an active session running.\n\nStarting a new session will redeploy the backend.\n\nContinue?',
+                confirmText: 'REDEPLOY',
+                type: 'warning',
+                onConfirm: () => {
+                    setShowConfirmModal(false);
+                    performDeploy();
+                }
+            });
+            setShowConfirmModal(true);
+            return;
         }
-        
-        // No existing pipeline - proceed directly
-        performDeploy(null);
+
+        performDeploy();
     };
 
-    const performDeploy = async (oldPipelineId) => {
+    const performDeploy = async () => {
         setIsDeploying(true);
         setIsDeactivating(false);
         setDeploymentStatus('deploying');
         setShowDeployModal(true);
-        setDeploymentProgress({ percentage: 0, message: 'Initializing deployment sequence...' });
+        setDeploymentProgress({ percentage: 0, message: 'Initializing deployment...' });
 
         try {
-            // If there's an old pipeline, cancel it first
-            if (oldPipelineId) {
-                setDeploymentProgress({ percentage: 5, message: 'Stopping previous session...' });
-                await cancelGitLabPipeline(oldPipelineId);
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for cancellation
-            }
-
-            // Step 1: Trigger pipeline (10%)
-            setDeploymentProgress({ percentage: 10, message: 'Initializing system...' });
-            
-            // Get current user's username
             if (!currentUser || !currentUser.username) {
                 throw new Error('User information not available. Please refresh and try again.');
             }
 
-            const triggerResult = await triggerGitLabPipeline(currentUser.username);
-
-            if (!triggerResult.success) {
-                throw new Error(triggerResult.error || 'Failed to trigger deployment');
-            }
-
-            // Store the subdomain for later use (but don't show it to user)
-            const subdomain = triggerResult.subdomain;
-            const backendUrl = `https://${subdomain}.loca.lt`;
-
-            // Update the backend URL in the app
-            setBackendUrl(backendUrl);
-            storageManager.setItem('backendSubdomain', subdomain);
-            storageManager.setItem('deploymentStatus', 'deployed');
-            storageManager.setItem('pipelineId', triggerResult.pipeline_id.toString());
-
-            // ✅ FIXED: Clear old tunnels from previous deployments
+            // Clear old backend URL
             tunnelStorage.clearAllTunnels();
 
-            // ✅ NEW: Add 3 NEW tunnels from current deployment
-            const tunnel1Url = `https://${subdomain}-tunnel1.loca.lt`;
-            const tunnel2Url = `https://${subdomain}-tunnel2.loca.lt`;
-            const tunnel3Url = `https://${subdomain}-tunnel3.loca.lt`;
+            // Step 1: Call Edge Function to redeploy Railway (0% → 80%)
+            setDeploymentProgress({ percentage: 10, message: 'Deploying backend to Railway...' });
 
-            tunnelStorage.addTunnel(tunnel1Url);
-            tunnelStorage.addTunnel(tunnel2Url);
-            tunnelStorage.addTunnel(tunnel3Url);
-            tunnelStorage.setActiveTunnel(tunnel1Url);
+            const result = await activateBackend(currentUser.username);
 
-            console.log(`🌐 NEW TUNNELS REGISTERED:`);
-            console.log(`   Tunnel 1: ${tunnel1Url}`);
-            console.log(`   Tunnel 2: ${tunnel2Url}`);
-            console.log(`   Tunnel 3: ${tunnel3Url}`);
-
-            // Step 2: Pipeline triggered (20%)
-            setDeploymentProgress({ percentage: 20, message: 'System initialized...' });
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Step 3: Waiting for pipeline to start (30%)
-            setDeploymentProgress({ percentage: 30, message: 'Establishing connection...' });
-
-            // Step 4: Poll until pipeline reaches "Keep running" stage (30% - 90%)
-            const pollResult = await pollGitLabPipelineUntilRunning(
-                triggerResult.pipeline_id,
-                (progress) => {
-                    // Calculate percentage based on attempts (30% to 90%)
-                    const progressPercent = 30 + Math.min(60, (progress.attempt / progress.maxAttempts) * 60);
-                    setDeploymentProgress({
-                        percentage: Math.round(progressPercent),
-                        message: `Activating system... (${progress.status})`
-                    });
-                }
-            );
-
-            if (!pollResult.success) {
-                throw new Error(pollResult.error || 'Deployment failed');
+            if (!result.success) {
+                throw new Error(result.error || 'Activation failed');
             }
 
-            // Step 5: Finalizing (95%)
-            setDeploymentProgress({ percentage: 95, message: 'Finalizing activation...' });
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const backendUrl = result.backend_url;
+            const userId = result.userId;
 
-            // Step 6: Success! (100%) - Don't show backend URL
-            setDeploymentProgress({ 
-                percentage: 100, 
-                message: 'Galaxy Kick Lock 2.0 activated!' 
+            if (!backendUrl) {
+                throw new Error('No backend URL returned. Contact admin to set up your service.');
+            }
+
+            console.log(`Railway backend URL: ${backendUrl}`);
+            setDeploymentProgress({ percentage: 80, message: 'Backend deployed, verifying health...' });
+
+            // Step 2: Health check from frontend (80% → 98%)
+            // Edge function already does health check, but verify from browser too (CORS/network)
+            let healthOk = result.health;
+            if (!healthOk) {
+                const maxHealthAttempts = 20;
+                for (let i = 1; i <= maxHealthAttempts; i++) {
+                    try {
+                        const healthRes = await fetch(`${backendUrl}/api/health`, {
+                            method: 'GET',
+                            headers: { 'bypass-tunnel-reminder': 'true' },
+                            signal: AbortSignal.timeout(10000)
+                        });
+                        if (healthRes.ok) {
+                            healthOk = true;
+                            break;
+                        }
+                        setDeploymentProgress({
+                            percentage: 80 + Math.min(18, Math.round((i / maxHealthAttempts) * 18)),
+                            message: `Backend responding HTTP ${healthRes.status}... retrying (${i}/${maxHealthAttempts})`
+                        });
+                    } catch {
+                        setDeploymentProgress({
+                            percentage: 80 + Math.min(18, Math.round((i / maxHealthAttempts) * 18)),
+                            message: `Waiting for backend... (${i}/${maxHealthAttempts})`
+                        });
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+
+            if (!healthOk) {
+                throw new Error('Backend deployed but not responding. Please try again.');
+            }
+
+            // Save URL and finalize
+            setBackendUrl(backendUrl);
+            tunnelStorage.saveBackendUrl(backendUrl);
+            storageManager.setItem('deploymentStatus', 'deployed');
+            storageManager.setItem('userId', userId);
+
+            // Step 3: Success! (100%)
+            setDeploymentProgress({
+                percentage: 100,
+                message: 'Galaxy Kick Lock 2.0 activated!'
             });
             setDeploymentStatus('deployed');
-            setCurrentRunId(triggerResult.pipeline_id);
-            
-            // Trigger custom event to notify components that deployment is complete
-            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', { 
-                detail: { status: 'deployed', backendUrl } 
+
+            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', {
+                detail: { status: 'deployed', backendUrl }
             }));
-            
-            // Start deployment monitoring to detect if backend stops
-            if (onDeploymentSuccess && triggerResult.pipeline_id) {
-                onDeploymentSuccess(triggerResult.pipeline_id);
+
+            if (onDeploymentSuccess) {
+                onDeploymentSuccess();
             }
-            
-            // Keep modal open for user to see success
+
         } catch (error) {
             console.error('Deployment error:', error);
             setDeploymentStatus('failed');
-            setDeploymentProgress({ 
-                percentage: 0, 
-                message: error.message || error.toString() || 'Deployment failed. Please try again.'
+            setDeploymentProgress({
+                percentage: 0,
+                message: error.message || 'Deployment failed. Please try again.'
             });
             clearBackendUrl();
+            tunnelStorage.clearAllTunnels();
             storageManager.removeItem('deploymentStatus');
-            storageManager.removeItem('pipelineId');
+            storageManager.removeItem('userId');
         } finally {
             setIsDeploying(false);
         }
@@ -283,7 +254,7 @@ const CommandBar = ({
                     const { apiClient } = await import('../../utils/api');
                     await apiClient.configure({ exitting: true });
                     setDeploymentProgress({ percentage: 10, message: 'Exit signal sent, waiting for bot to finish...' });
-                    await new Promise(resolve => setTimeout(resolve, 3000)); // Give bot 3s to finish current action
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 } catch (err) {
                     console.warn('Failed to send exit signal:', err);
                 }
@@ -298,61 +269,54 @@ const CommandBar = ({
                 }
             }
 
-            // Try to cancel the current pipeline
-            let pipelineIdToCancel = currentRunId;
-            
-            // If we don't have a stored pipeline ID, try to get the latest running one
-            if (!pipelineIdToCancel) {
-                setDeploymentProgress({ percentage: 40, message: 'Finding active pipeline...' });
-                pipelineIdToCancel = await getLatestRunningGitLabPipeline();
-            }
+            // Step 3: Stop Railway backend via Edge Function
+            setDeploymentProgress({ percentage: 40, message: 'Stopping Railway backend...' });
+            const stopResult = await deactivateBackend(currentUser?.username);
 
-            if (pipelineIdToCancel) {
-                setDeploymentProgress({ percentage: 60, message: 'Stopping pipeline...' });
-                const cancelResult = await cancelGitLabPipeline(pipelineIdToCancel);
-
-                if (!cancelResult.success) {
-                    console.warn('Failed to cancel pipeline:', cancelResult.error);
-                    // Continue anyway - pipeline might have already completed
-                }
-
-                setDeploymentProgress({ percentage: 85, message: 'System stopped...' });
+            if (stopResult.success) {
+                setDeploymentProgress({ percentage: 90, message: 'Backend stopped...' });
             } else {
-                setDeploymentProgress({ percentage: 60, message: 'No active session found...' });
+                console.warn('Stop failed:', stopResult.error);
+                setDeploymentProgress({ percentage: 80, message: 'Stop signal sent...' });
             }
 
-            // Clear deployment state
-            await new Promise(resolve => setTimeout(resolve, 1000));
             setDeploymentProgress({ percentage: 100, message: 'System deactivated successfully!' });
-            
-            // Reset state
-            setTimeout(() => {
-                setDeploymentStatus('idle');
-                setCurrentRunId(null);
-                setIsDeactivating(false);
-                clearBackendUrl();
-                storageManager.removeItem('deploymentStatus');
-                storageManager.removeItem('pipelineId');
-                storageManager.removeItem('localTestMode');
-                
-                // Trigger custom event to notify components
-                window.dispatchEvent(new CustomEvent('deploymentStatusChanged', { 
-                    detail: { status: 'idle' } 
-                }));
-                
-                setShowDeployModal(false);
-            }, 2000);
+
+            // Show success for 2 seconds, then reset
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Reset all state
+            clearBackendUrl();
+            tunnelStorage.clearAllTunnels();
+            storageManager.removeItem('deploymentStatus');
+            storageManager.removeItem('userId');
+            setDeploymentStatus('idle');
+            setCurrentRunId(null);
+            setIsDeactivating(false);
+            setIsDeploying(false);
+            setShowDeployModal(false);
+
+            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', {
+                detail: { status: 'idle' }
+            }));
 
         } catch (error) {
             console.error('Undeploy error:', error);
-            setDeploymentStatus('failed');
+            setDeploymentStatus('idle');
             setIsDeactivating(false);
-            setDeploymentProgress({ 
-                percentage: 0, 
+            setIsDeploying(false);
+            clearBackendUrl();
+            tunnelStorage.clearAllTunnels();
+            storageManager.removeItem('deploymentStatus');
+            storageManager.removeItem('userId');
+            setDeploymentProgress({
+                percentage: 0,
                 message: `Deactivation failed: ${error.message}`
             });
-        } finally {
-            setIsDeploying(false);
+
+            window.dispatchEvent(new CustomEvent('deploymentStatusChanged', {
+                detail: { status: 'idle' }
+            }));
         }
     };
 

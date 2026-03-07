@@ -47,7 +47,6 @@ const MLLearningModal = ({ isOpen, onClose, connectionNumber, backendUrl, userId
       const response = await fetch(`${backendUrl}/api/metrics/${connectionNumber}`, {
         headers: {
           'Content-Type': 'application/json',
-          'bypass-tunnel-reminder': 'true',
           'x-user-id': userId
         }
       });

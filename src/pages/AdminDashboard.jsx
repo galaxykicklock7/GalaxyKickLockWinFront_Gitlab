@@ -109,12 +109,13 @@ function AdminDashboard() {
       {/* Main Content */}
       <main className="admin-main">
         <div className="admin-container">
-          <TokenGenerator onTokenGenerated={handleTokenGenerated} onTokenDeleted={handleTokenDeleted} refreshTrigger={refreshTrigger} />
-          <UserManagement 
-            refreshTrigger={refreshTrigger} 
-            onTokenRenewed={handleTokenRenewed} 
+          <TokenGenerator onTokenGenerated={handleTokenGenerated} onTokenDeleted={handleTokenDeleted} refreshTrigger={refreshTrigger} adminSession={adminSession} />
+          <UserManagement
+            refreshTrigger={refreshTrigger}
+            onTokenRenewed={handleTokenRenewed}
             onShowModal={handleShowModal}
             onShowConfirm={handleShowConfirm}
+            adminSession={adminSession}
           />
         </div>
       </main>

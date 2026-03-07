@@ -97,6 +97,30 @@ export const registerUser = async (username, password, confirmPassword, token) =
     // Success - reset rate limiter
     rateLimiter.reset('signup');
 
+    // Remap user_deployments: change user_id from token placeholder to actual username
+    // so ACTIVATE/DEACTIVATE can find the correct service
+    if (data.user_id) {
+      try {
+        const cleanUsername = trimmedUsername.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Find the deployment row linked to this token and update user_id
+        const { data: tokenData } = await supabase
+          .from('users')
+          .select('token_id')
+          .eq('id', data.user_id)
+          .single();
+
+        if (tokenData?.token_id) {
+          await supabase
+            .from('user_deployments')
+            .update({ user_id: cleanUsername, updated_at: new Date().toISOString() })
+            .eq('user_id', `token_${tokenData.token_id}`);
+        }
+      } catch (mapErr) {
+        console.warn('Failed to remap user deployment:', mapErr);
+        // Non-critical — admin can fix manually
+      }
+    }
+
     return { success: true, data };
   } catch (err) {
     console.error('Registration exception:', err);
@@ -176,7 +200,26 @@ export const loginUser = async (username, password) => {
         return { success: false, error: 'Invalid username or password' };
       }
       if (errorMsg.includes('expired')) {
-        return { success: false, error: 'Your subscription has expired. Please contact support.' };
+        // Trigger service cleanup for expired user in the background
+        try {
+          const cleanUsername = trimmedUsername.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const { data: deployRow } = await supabase
+            .from('user_deployments')
+            .select('railway_service_id')
+            .eq('user_id', cleanUsername)
+            .maybeSingle();
+
+          if (deployRow?.railway_service_id) {
+            // Delete the deployment row — Railway service cleanup handled by admin dashboard
+            await supabase
+              .from('user_deployments')
+              .delete()
+              .eq('user_id', cleanUsername);
+          }
+        } catch (cleanupErr) {
+          console.warn('Expired token cleanup failed:', cleanupErr);
+        }
+        return { success: false, error: 'Your subscription has expired. Please contact admin to renew.' };
       }
       if (errorMsg.includes('inactive')) {
         return { success: false, error: 'Account is inactive. Please contact support.' };

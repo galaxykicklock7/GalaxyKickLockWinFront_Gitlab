@@ -1,0 +1,23 @@
+{
+  "name": "goat-backend",
+  "version": "1.0.0",
+  "description": "Kicking program for galaxy",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "node main.js"
+  },
+  "author": "THALA",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^0.21.1",
+    "body-parser": "^1.19.0",
+    "crypto-js": "^4.0.0",
+    "dotenv": "^17.3.1",
+    "express": "^4.17.1",
+    "isomorphic-ws": "^5.0.0",
+    "node-fetch": "^2.6.7",
+    "ws": "^7.5.0"
+  }
+}

@@ -1,29 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getGitLabPipelineStatus } from '../utils/gitlab';
-import { clearBackendUrl } from '../utils/backendUrl';
+import { getBackendUrlFromSupabase } from '../utils/gitlab';
+import { clearBackendUrl, getBackendUrl } from '../utils/backendUrl';
 import { storageManager } from '../utils/storageManager';
 
 /**
  * Custom hook to monitor deployment system status
- * Detects when backend deployment stops/crashes and auto-resets UI
+ * Checks backend health directly — pipeline status no longer relevant
+ * since Railway manages the backend lifecycle independently.
  */
 export const useWorkflowMonitor = (showToast) => {
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [deploymentId, setDeploymentId] = useState(null);
 
   const resetDeploymentState = useCallback((reason) => {
-    // Clear deployment state using storage manager
     storageManager.removeItem('deploymentStatus');
     storageManager.removeItem('pipelineId');
-    storageManager.removeItem('backendSubdomain');
     clearBackendUrl();
 
-    // Emit event to reset UI
     window.dispatchEvent(new CustomEvent('deploymentStatusChanged', {
       detail: { status: 'idle' }
     }));
 
-    // Show toast notification
     if (showToast) {
       showToast(
         `System closed unexpectedly. ${reason}. Please activate system again.`,
@@ -31,80 +27,73 @@ export const useWorkflowMonitor = (showToast) => {
       );
     }
 
-    // Stop monitoring
     setIsMonitoring(false);
-    setDeploymentId(null);
   }, [showToast]);
 
-  const checkDeploymentStatus = useCallback(async () => {
-    if (!deploymentId) return;
+  const checkBackendHealth = useCallback(async () => {
+    const backendUrl = getBackendUrl();
+    if (!backendUrl) return;
 
     try {
-      const result = await getGitLabPipelineStatus(deploymentId);
+      const res = await fetch(`${backendUrl}/api/health`, {
+        method: 'GET',
+        headers: { 'bypass-tunnel-reminder': 'true' },
+        signal: AbortSignal.timeout(10000)
+      });
 
-      if (!result.success) {
-        return;
-      }
-
-      // Check if deployment has stopped
-      if (result.status === 'success' || result.status === 'failed' || result.status === 'canceled' || result.status === 'skipped') {
-        // Deployment completed
-        let reason = 'Deployment completed';
-
-        if (result.status === 'success') {
-          reason = 'System finished successfully';
-        } else if (result.status === 'failed') {
-          reason = 'System failed';
-        } else if (result.status === 'canceled') {
-          reason = 'System was cancelled';
-        }
-
-        resetDeploymentState(reason);
+      if (!res.ok) {
+        // Backend responded but not healthy — could be restarting, don't reset yet
+        console.warn(`Backend health check: HTTP ${res.status}`);
       }
     } catch (error) {
-      // Silent error - don't expose system details
+      // Network error — backend might be down
+      // Only reset if we get consistent failures (3 in a row)
+      const failKey = '_healthFailCount';
+      const failCount = parseInt(storageManager.getItem(failKey) || '0') + 1;
+      storageManager.setItem(failKey, failCount.toString());
+
+      if (failCount >= 3) {
+        storageManager.removeItem(failKey);
+        resetDeploymentState('Backend is not responding');
+      }
+      return;
     }
-  }, [deploymentId, resetDeploymentState]);
+
+    // Reset fail counter on success
+    storageManager.removeItem('_healthFailCount');
+  }, [resetDeploymentState]);
 
   // Start monitoring when deployment is active
   useEffect(() => {
     const savedDeploymentStatus = storageManager.getItem('deploymentStatus');
-    const savedDeploymentId = storageManager.getItem('pipelineId');
-    
-    if (savedDeploymentStatus === 'deployed' && savedDeploymentId) {
-      setDeploymentId(parseInt(savedDeploymentId));
+
+    if (savedDeploymentStatus === 'deployed') {
       setIsMonitoring(true);
     }
   }, []);
 
-  // Monitor deployment status with smart polling
+  // Monitor backend health with polling
   useEffect(() => {
-    if (!isMonitoring || !deploymentId) return;
+    if (!isMonitoring) return;
 
-    // Check immediately
-    checkDeploymentStatus();
-
-    // Then check every 10 seconds
+    // Check every 30 seconds (backend is stable on Railway, no need for aggressive polling)
     const monitorInterval = setInterval(() => {
-      checkDeploymentStatus();
-    }, 10000); // 10 seconds
+      checkBackendHealth();
+    }, 30000);
 
     return () => {
       clearInterval(monitorInterval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMonitoring, deploymentId]); // checkDeploymentStatus removed to prevent restart loop
+  }, [isMonitoring, checkBackendHealth]);
 
-  // Start monitoring manually (called after successful deployment)
-  const startMonitoring = useCallback((runId) => {
-    setDeploymentId(runId);
+  const startMonitoring = useCallback(() => {
+    storageManager.removeItem('_healthFailCount');
     setIsMonitoring(true);
   }, []);
 
-  // Stop monitoring manually
   const stopMonitoring = useCallback(() => {
     setIsMonitoring(false);
-    setDeploymentId(null);
+    storageManager.removeItem('_healthFailCount');
   }, []);
 
   return {

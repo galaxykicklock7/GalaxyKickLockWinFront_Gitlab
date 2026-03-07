@@ -9,12 +9,359 @@
   margin-bottom: 32px;
 }
 
+.token-generator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
 .token-generator-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: #f8fafc;
-  margin: 0 0 24px 0;
-  text-align: center;
+  margin: 0;
+}
+
+/* Railway Settings Toggle */
+.railway-settings-toggle {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.railway-settings-toggle:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Railway Accounts Panel */
+.railway-accounts-panel {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.railway-accounts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.railway-accounts-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.railway-add-btn {
+  padding: 6px 14px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 6px;
+  color: #86efac;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.railway-add-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.6);
+}
+
+/* Accounts List */
+.railway-accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.railway-account-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 8px;
+  padding: 10px 14px;
+  transition: all 0.2s ease;
+}
+
+.railway-account-row:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.railway-account-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.railway-account-label {
+  font-weight: 600;
+  color: #f8fafc;
+  font-size: 0.9375rem;
+}
+
+.railway-account-project {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.railway-account-count {
+  font-size: 0.8125rem;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.railway-account-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.railway-edit-btn,
+.railway-del-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.railway-edit-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+.railway-edit-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.railway-del-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.railway-del-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Account Form */
+.railway-account-form {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.railway-form-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #93c5fd;
+  margin: 0;
+}
+
+.railway-form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.railway-cancel-btn {
+  padding: 10px 20px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.railway-cancel-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+/* Account Selector Modal */
+.account-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.account-selector-modal {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 16px;
+  padding: 28px;
+  min-width: 360px;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+}
+
+.account-selector-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 6px 0;
+}
+
+.account-selector-subtitle {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0 0 20px 0;
+}
+
+.account-selector-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.account-selector-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  color: #e2e8f0;
+}
+
+.account-selector-card:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateX(4px);
+}
+
+.account-card-label {
+  font-weight: 600;
+  color: #f8fafc;
+  font-size: 0.9375rem;
+}
+
+.account-card-project {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.account-card-count {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  color: #93c5fd;
+}
+
+.account-selector-cancel {
+  width: 100%;
+  padding: 10px;
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-selector-cancel:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.railway-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.railway-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.railway-input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-family: 'Courier New', monospace;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.railway-input:focus {
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.railway-input::placeholder {
+  color: rgba(148, 163, 184, 0.4);
+}
+
+.railway-save-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.railway-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.railway-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .token-error {
@@ -284,6 +631,156 @@
 .token-item-date {
   font-size: 0.75rem;
   color: rgba(148, 163, 184, 0.7);
+}
+
+/* Token Service Info */
+.token-service-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(34, 197, 94, 0.05);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.token-account-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.token-service-url {
+  font-family: 'Courier New', monospace;
+  font-size: 0.6875rem;
+  color: #86efac;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.token-service-status {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.token-service-status.status-active {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.token-service-status.status-stopped {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+/* Migration Progress Modal */
+.migration-modal {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 16px;
+  padding: 28px;
+  min-width: 420px;
+  max-width: 560px;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+}
+
+.migration-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 16px 0;
+}
+
+.migration-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.migration-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.migration-progress-text {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  margin: 0 0 16px 0;
+}
+
+.migration-log {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.migration-log-line {
+  color: #94a3b8;
+}
+
+.migration-log-line.log-error {
+  color: #fca5a5;
+}
+
+.migration-log-line.log-success {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.migration-log::-webkit-scrollbar {
+  width: 4px;
+}
+
+.migration-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.migration-log::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 2px;
+}
+
+.migration-close-btn {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.migration-close-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 /* Responsive */

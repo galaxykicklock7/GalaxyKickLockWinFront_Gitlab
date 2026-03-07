@@ -106,7 +106,7 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
                 if (isEnabled) {
                     fetchWithRetry(`${backendUrl}/api/ai/chat/enable/${connNum}`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' }
+                        headers: { 'Content-Type': 'application/json' }
                     }).catch(err => console.warn(`[AI Chat] Failed to re-enable chat ${connNum}:`, err));
                 }
             });
@@ -144,7 +144,6 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
             const response = await fetchWithRetry(`${backendUrl}/api/metrics/${connNum}`, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'bypass-tunnel-reminder': 'true',
                     'x-user-id': session.user_id
                 }
             });
@@ -208,7 +207,6 @@ const NeuralLink = ({ config, onConfigChange, status, connected, aiCoreEnabled }
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'bypass-tunnel-reminder': 'true',
                 }
             });
 

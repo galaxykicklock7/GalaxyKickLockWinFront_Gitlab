@@ -60,8 +60,7 @@ const ConnectionPanel = ({
       const response = await fetch(`${backendUrl}/api/metrics/${connNum}`, {
         headers: {
           'Content-Type': 'application/json',
-          'bypass-tunnel-reminder': 'true',
-          'x-user-id': user.id // Send user ID from Supabase auth
+          'x-user-id': user.id
         }
       });
 
