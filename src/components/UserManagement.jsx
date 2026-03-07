@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   getAllUsers, renewUserToken, deleteUser, deleteToken,
-  getRailwayAccounts, getAccountById, getServiceByTokenId,
+  getRailwayAccounts, getServiceByTokenId,
   deleteRailwayService, deleteUserDeployment, provisionRailwayService,
   saveServiceMapping, getRailwayServiceStatus
 } from '../utils/adminApi';
@@ -99,29 +99,12 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
     await Promise.all(
       userList.filter(u => infoMap[u.id]?.railway_service_id && infoMap[u.id]?.railway_account_id).map(async (user) => {
         const info = infoMap[user.id];
-        const acc = accountMap[info.railway_account_id];
-        if (!acc) {
-          // Account might not be loaded yet, try fetching
-          const accResult = await getAccountById(info.railway_account_id);
-          if (accResult.success && accResult.data) {
-            const statusResult = await getRailwayServiceStatus(
-              accResult.data.railway_api_token,
-              accResult.data.railway_project_id,
-              info.railway_service_id
-            );
-            if (statusResult.success) {
-              statusMap[user.id] = statusResult.status;
-            }
-          }
-        } else {
-          const statusResult = await getRailwayServiceStatus(
-            acc.railway_api_token,
-            acc.railway_project_id,
-            info.railway_service_id
-          );
-          if (statusResult.success) {
-            statusMap[user.id] = statusResult.status;
-          }
+        const statusResult = await getRailwayServiceStatus(
+          info.railway_account_id,
+          info.railway_service_id
+        );
+        if (statusResult.success) {
+          statusMap[user.id] = statusResult.status;
         }
       })
     );
@@ -134,24 +117,8 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
 
     for (const item of expiredUsers) {
       try {
-        // Get account credentials
-        let apiToken, projectId;
         if (item.railwayAccountId) {
-          const acc = accountMap[item.railwayAccountId];
-          if (acc) {
-            apiToken = acc.railway_api_token;
-            projectId = acc.railway_project_id;
-          } else {
-            const accResult = await getAccountById(item.railwayAccountId);
-            if (accResult.success && accResult.data) {
-              apiToken = accResult.data.railway_api_token;
-              projectId = accResult.data.railway_project_id;
-            }
-          }
-        }
-
-        if (apiToken && projectId) {
-          await deleteRailwayService(apiToken, projectId, item.serviceId);
+          await deleteRailwayService(item.railwayAccountId, item.serviceId);
         }
 
         const cleanUsername = item.username.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -195,23 +162,8 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
       // Step 1: Delete old Railway service if exists
       const oldService = serviceInfoMap[userId];
       if (oldService?.railway_service_id) {
-        let apiToken, projectId;
         if (oldService.railway_account_id) {
-          const acc = accountMap[oldService.railway_account_id];
-          if (acc) {
-            apiToken = acc.railway_api_token;
-            projectId = acc.railway_project_id;
-          } else {
-            const accResult = await getAccountById(oldService.railway_account_id);
-            if (accResult.success && accResult.data) {
-              apiToken = accResult.data.railway_api_token;
-              projectId = accResult.data.railway_project_id;
-            }
-          }
-        }
-
-        if (apiToken && projectId) {
-          await deleteRailwayService(apiToken, projectId, oldService.railway_service_id)
+          await deleteRailwayService(oldService.railway_account_id, oldService.railway_service_id)
             .catch(err => console.warn('Failed to delete old service:', err));
         }
 
@@ -246,8 +198,7 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
 
         const serviceName = `gkl-${result.token_value.substring(0, 8).toLowerCase()}`;
         const provisionResult = await provisionRailwayService(
-          selectedAccount.railway_api_token,
-          selectedAccount.railway_project_id,
+          selectedAccount.id,
           serviceName
         );
 
@@ -318,23 +269,8 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
       }
 
       if (serviceInfo?.railway_service_id) {
-        let apiToken, projectId;
         if (serviceInfo.railway_account_id) {
-          const acc = accountMap[serviceInfo.railway_account_id];
-          if (acc) {
-            apiToken = acc.railway_api_token;
-            projectId = acc.railway_project_id;
-          } else {
-            const accResult = await getAccountById(serviceInfo.railway_account_id);
-            if (accResult.success && accResult.data) {
-              apiToken = accResult.data.railway_api_token;
-              projectId = accResult.data.railway_project_id;
-            }
-          }
-        }
-
-        if (apiToken && projectId) {
-          const delResult = await deleteRailwayService(apiToken, projectId, serviceInfo.railway_service_id);
+          const delResult = await deleteRailwayService(serviceInfo.railway_account_id, serviceInfo.railway_service_id);
           serviceDeleted = delResult.success;
           if (!delResult.success) {
             console.warn('Failed to delete Railway service:', delResult.error);
@@ -399,23 +335,8 @@ function UserManagement({ refreshTrigger, onTokenRenewed, onShowModal, onShowCon
       let serviceDeleted = false;
       const serviceResult = await getServiceByTokenId(tokenId);
       if (serviceResult.success && serviceResult.data?.railway_service_id) {
-        let apiToken, projectId;
         if (serviceResult.data.railway_account_id) {
-          const acc = accountMap[serviceResult.data.railway_account_id];
-          if (acc) {
-            apiToken = acc.railway_api_token;
-            projectId = acc.railway_project_id;
-          } else {
-            const accResult = await getAccountById(serviceResult.data.railway_account_id);
-            if (accResult.success && accResult.data) {
-              apiToken = accResult.data.railway_api_token;
-              projectId = accResult.data.railway_project_id;
-            }
-          }
-        }
-
-        if (apiToken && projectId) {
-          const delResult = await deleteRailwayService(apiToken, projectId, serviceResult.data.railway_service_id);
+          const delResult = await deleteRailwayService(serviceResult.data.railway_account_id, serviceResult.data.railway_service_id);
           serviceDeleted = delResult.success;
           if (!delResult.success) {
             console.warn('Failed to delete Railway service:', delResult.error);

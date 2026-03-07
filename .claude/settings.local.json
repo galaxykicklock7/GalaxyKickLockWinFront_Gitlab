@@ -6,7 +6,8 @@
       "WebFetch(domain:station.railway.com)",
       "Bash(npx vite:*)",
       "WebFetch(domain:github.com)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(node:*)"
     ]
   }
 }

@@ -139,12 +139,12 @@ export async function deleteToken(tokenId) {
 // Railway Accounts (Multi-Account Support)
 // ─────────────────────────────────────────────
 
-// Get all Railway accounts for the admin
+// Get all Railway accounts for the admin (excludes sensitive token)
 export async function getRailwayAccounts(adminId) {
   try {
     const { data, error } = await supabase
       .from('railway_accounts')
-      .select('*')
+      .select('id, admin_id, label, railway_project_id, created_at, updated_at')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: true });
 
@@ -156,12 +156,12 @@ export async function getRailwayAccounts(adminId) {
   }
 }
 
-// Get a single Railway account by ID
+// Get a single Railway account by ID (excludes sensitive token)
 export async function getAccountById(accountId) {
   try {
     const { data, error } = await supabase
       .from('railway_accounts')
-      .select('*')
+      .select('id, admin_id, label, railway_project_id, created_at, updated_at')
       .eq('id', accountId)
       .single();
 
@@ -289,8 +289,8 @@ export async function updateUserDeployment(userId, updates) {
   }
 }
 
-// Get live Railway service status via edge function
-export async function getRailwayServiceStatus(railwayApiToken, railwayProjectId, serviceId) {
+// Get live Railway service status via edge function (sends account_id, not raw token)
+export async function getRailwayServiceStatus(railwayAccountId, serviceId) {
   try {
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/railway-status`,
@@ -301,8 +301,7 @@ export async function getRailwayServiceStatus(railwayApiToken, railwayProjectId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          railway_api_token: railwayApiToken,
-          railway_project_id: railwayProjectId,
+          railway_account_id: railwayAccountId,
           service_id: serviceId,
         }),
       }
@@ -321,8 +320,8 @@ export async function getRailwayServiceStatus(railwayApiToken, railwayProjectId,
   }
 }
 
-// Provision a Railway service for a token
-export async function provisionRailwayService(railwayApiToken, railwayProjectId, serviceName) {
+// Provision a Railway service for a token (sends account_id, not raw token)
+export async function provisionRailwayService(railwayAccountId, serviceName) {
   try {
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/railway-provision`,
@@ -333,8 +332,7 @@ export async function provisionRailwayService(railwayApiToken, railwayProjectId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          railway_api_token: railwayApiToken,
-          railway_project_id: railwayProjectId,
+          railway_account_id: railwayAccountId,
           service_name: serviceName,
         }),
       }
@@ -386,8 +384,8 @@ export async function saveServiceMapping(tokenId, serviceId, backendUrl, railway
   }
 }
 
-// Delete Railway service
-export async function deleteRailwayService(railwayApiToken, railwayProjectId, serviceId) {
+// Delete Railway service (sends account_id, not raw token)
+export async function deleteRailwayService(railwayAccountId, serviceId) {
   try {
     const response = await fetch(
       `${SUPABASE_URL}/functions/v1/railway-delete`,
@@ -398,8 +396,7 @@ export async function deleteRailwayService(railwayApiToken, railwayProjectId, se
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          railway_api_token: railwayApiToken,
-          railway_project_id: railwayProjectId,
+          railway_account_id: railwayAccountId,
           service_id: serviceId,
         }),
       }

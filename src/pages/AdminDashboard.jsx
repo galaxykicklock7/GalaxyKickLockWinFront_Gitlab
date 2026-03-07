@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAdminSession, logoutAdmin } from '../utils/adminAuth';
+import { getAdminSession, logoutAdmin, validateAdminSessionWithBackend } from '../utils/adminAuth';
 import TokenGenerator from '../components/TokenGenerator';
 import UserManagement from '../components/UserManagement';
 import Modal from '../components/Modal';
@@ -18,9 +18,22 @@ function AdminDashboard() {
     const session = getAdminSession();
     if (!session) {
       navigate('/admin');
-    } else {
-      setAdminSession(session);
+      return;
     }
+    setAdminSession(session);
+
+    // Validate session with backend (server-side check)
+    validateAdminSessionWithBackend()
+      .then(result => {
+        if (!result.valid) {
+          console.warn('Admin session invalid:', result.reason);
+          navigate('/admin');
+        }
+      })
+      .catch(() => {
+        // Network error — keep session alive, don't force logout
+        console.warn('Could not validate admin session (network issue)');
+      });
   }, [navigate]);
 
   const handleLogout = () => {

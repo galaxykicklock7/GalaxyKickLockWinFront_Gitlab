@@ -92,6 +92,7 @@ export async function loginAdmin(username, password) {
         admin_id: data.admin_id,
         username: data.username,
         session_token: data.session_token,
+        expires_at: data.expires_at,
         login_time: new Date().toISOString()
       };
       localStorage.setItem('adminSession', JSON.stringify(adminSession));
@@ -119,17 +120,30 @@ export function getAdminSession() {
 
   try {
     const session = JSON.parse(sessionStr);
-    
-    // Check if session is expired (24 hours)
-    const loginTime = new Date(session.login_time);
     const now = new Date();
-    const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-    
-    if (hoursDiff > 24) {
+
+    // Check server-provided expiry first
+    if (session.expires_at) {
+      if (now > new Date(session.expires_at)) {
+        logoutAdmin();
+        return null;
+      }
+    } else {
+      // Fallback: 24-hour check from login_time (for sessions created before this update)
+      const loginTime = new Date(session.login_time);
+      const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
+      if (hoursDiff > 24) {
+        logoutAdmin();
+        return null;
+      }
+    }
+
+    // Validate session has required fields
+    if (!session.admin_id || !session.username || !session.session_token) {
       logoutAdmin();
       return null;
     }
-    
+
     return session;
   } catch (error) {
     console.error('Error parsing admin session:', error);
@@ -137,7 +151,37 @@ export function getAdminSession() {
   }
 }
 
-// Check if Admin is Authenticated
+// Check if Admin is Authenticated (local check only — use validateAdminSessionWithBackend for server-side)
 export function isAdminAuthenticated() {
   return getAdminSession() !== null;
+}
+
+// Validate admin session with backend (server-side check)
+export async function validateAdminSessionWithBackend() {
+  const session = getAdminSession();
+  if (!session || !session.session_token) {
+    return { valid: false, reason: 'No admin session' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('validate_admin_session', {
+      p_session_token: session.session_token
+    });
+
+    if (error) {
+      console.error('Admin session validation error:', error);
+      // Network error — don't logout, let caller decide
+      throw error;
+    }
+
+    if (!data || !data.valid) {
+      logoutAdmin();
+      return { valid: false, reason: data?.error || 'Admin session invalid' };
+    }
+
+    return { valid: true };
+  } catch (err) {
+    // Re-throw so caller can distinguish network error from invalid session
+    throw err;
+  }
 }

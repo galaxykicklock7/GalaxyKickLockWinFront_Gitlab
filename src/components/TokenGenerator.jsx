@@ -3,7 +3,7 @@ import {
   generateToken, getTokensByDuration, deleteToken,
   getRailwayAccounts, addRailwayAccount, updateRailwayAccount, deleteRailwayAccount,
   getServiceCountsByAccount, provisionRailwayService, saveServiceMapping,
-  getServiceByTokenId, deleteRailwayService, deleteUserDeployment, getAccountById,
+  getServiceByTokenId, deleteRailwayService, deleteUserDeployment,
   getDeploymentsByAccountId, updateUserDeployment
 } from '../utils/adminApi';
 import Modal from './Modal';
@@ -71,8 +71,13 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
   };
 
   const handleSaveAccount = async () => {
-    if (!accountForm.label.trim() || !accountForm.token.trim() || !accountForm.projectId.trim()) {
-      setError('Label, Railway API Token, and Project ID are all required');
+    if (!accountForm.label.trim() || !accountForm.projectId.trim()) {
+      setError('Label and Project ID are required');
+      return;
+    }
+    // Token is required when adding new account, optional when editing (blank = keep current)
+    if (!editingAccount && !accountForm.token.trim()) {
+      setError('Railway API Token is required for new accounts');
       return;
     }
 
@@ -81,42 +86,28 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
 
     try {
       if (editingAccount) {
-        // Detect if credentials actually changed
-        const credentialsChanged =
-          accountForm.token.trim() !== editingAccount.railway_api_token ||
-          accountForm.projectId.trim() !== editingAccount.railway_project_id;
+        // Detect if credentials actually changed (compare against current project_id;
+        // we no longer have the raw token in frontend, so credential change = project_id changed or token field non-empty)
+        const projectIdChanged = accountForm.projectId.trim() !== editingAccount.railway_project_id;
+        const tokenChanged = accountForm.token.trim() !== '' && accountForm.token.trim() !== '********';
+        const credentialsChanged = projectIdChanged || tokenChanged;
 
-        // Save the OLD credentials before updating
-        const oldToken = editingAccount.railway_api_token;
-        const oldProjectId = editingAccount.railway_project_id;
-
-        // Update the account in DB first
-        const result = await updateRailwayAccount(editingAccount.id, {
-          label: accountForm.label.trim(),
-          railway_api_token: accountForm.token.trim(),
-          railway_project_id: accountForm.projectId.trim(),
-        });
-
-        if (!result.success) {
-          setError(result.error);
-          return;
-        }
-
-        await loadRailwayAccounts();
-
+        // If credentials changed and there are existing services, do migration:
+        // 1. Delete old services using CURRENT account_id (DB still has old creds)
+        // 2. Update account in DB with new creds
+        // 3. Provision new services using account_id (DB now has new creds)
         if (credentialsChanged) {
-          // Check if there are services on this account that need migration
           const deploymentsResult = await getDeploymentsByAccountId(editingAccount.id);
           if (deploymentsResult.success && deploymentsResult.deployments.length > 0) {
-            // Trigger migration
+            // Step 1: Delete old services while DB still has old credentials
             setAccountForm({ label: '', token: '', projectId: '' });
             setEditingAccount(null);
             setShowAccountPanel(false);
             setSavingAccount(false);
+
             await handleMigrateAccount(
               editingAccount.id,
-              oldToken,
-              oldProjectId,
+              accountForm.label.trim(),
               accountForm.token.trim(),
               accountForm.projectId.trim(),
               deploymentsResult.deployments
@@ -124,6 +115,25 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
             return;
           }
         }
+
+        // No migration needed — just update the account
+        const updateFields = {
+          label: accountForm.label.trim(),
+          railway_project_id: accountForm.projectId.trim(),
+        };
+        // Only update token if a new one was provided
+        if (accountForm.token.trim() && accountForm.token.trim() !== '********') {
+          updateFields.railway_api_token = accountForm.token.trim();
+        }
+
+        const result = await updateRailwayAccount(editingAccount.id, updateFields);
+
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+
+        await loadRailwayAccounts();
 
         setAccountForm({ label: '', token: '', projectId: '' });
         setEditingAccount(null);
@@ -156,7 +166,7 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
     }
   };
 
-  const handleMigrateAccount = async (accountId, oldToken, oldProjectId, newToken, newProjectId, deployments) => {
+  const handleMigrateAccount = async (accountId, newLabel, newToken, newProjectId, deployments) => {
     setMigratingAccount(accountId);
     setMigrationProgress({ current: 0, total: deployments.length, log: [] });
     setShowMigrationModal(true);
@@ -171,27 +181,52 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
     let successCount = 0;
     let failCount = 0;
 
+    // Phase 1: Delete all old services using current DB credentials (old creds still in DB)
+    addLog('Phase 1: Deleting old services...');
+    for (let i = 0; i < deployments.length; i++) {
+      const dep = deployments[i];
+      const label = dep.user_id || dep.token_id || 'unknown';
+
+      if (dep.railway_service_id) {
+        addLog(`  Deleting old service for "${label}"...`);
+        const delResult = await deleteRailwayService(accountId, dep.railway_service_id);
+        if (delResult.success) {
+          addLog(`  Deleted ${dep.railway_service_id.substring(0, 8)}...`);
+        } else {
+          addLog(`  Warning: Could not delete old service: ${delResult.error}`);
+        }
+      }
+    }
+
+    // Phase 2: Update account credentials in DB
+    addLog('Updating account credentials...');
+    const updateFields = {
+      label: newLabel,
+      railway_project_id: newProjectId,
+    };
+    if (newToken && newToken !== '********') {
+      updateFields.railway_api_token = newToken;
+    }
+    const updateResult = await updateRailwayAccount(accountId, updateFields);
+    if (!updateResult.success) {
+      addLog(`ERROR: Failed to update account: ${updateResult.error}`);
+      setMigratingAccount(null);
+      return;
+    }
+    addLog('Account credentials updated.');
+
+    // Phase 3: Provision new services using new credentials (now in DB)
+    addLog('Phase 3: Provisioning new services...');
     for (let i = 0; i < deployments.length; i++) {
       const dep = deployments[i];
       const label = dep.user_id || dep.token_id || 'unknown';
 
       setMigrationProgress(prev => ({ ...prev, current: i + 1 }));
-      addLog(`[${i + 1}/${deployments.length}] Migrating service for "${label}"...`);
+      addLog(`[${i + 1}/${deployments.length}] Provisioning new service for "${label}"...`);
 
       try {
-        // Step 1: Delete old service on OLD credentials (best effort)
-        if (dep.railway_service_id && oldToken && oldProjectId) {
-          const delResult = await deleteRailwayService(oldToken, oldProjectId, dep.railway_service_id);
-          if (delResult.success) {
-            addLog(`  Deleted old service ${dep.railway_service_id.substring(0, 8)}...`);
-          } else {
-            addLog(`  Warning: Could not delete old service: ${delResult.error}`);
-          }
-        }
-
-        // Step 2: Provision new service on NEW credentials
         const serviceName = `gkl-${(dep.user_id || dep.token_id || 'svc').substring(0, 8).toLowerCase()}`;
-        const provisionResult = await provisionRailwayService(newToken, newProjectId, serviceName);
+        const provisionResult = await provisionRailwayService(accountId, serviceName);
 
         if (!provisionResult.success) {
           addLog(`  FAILED to provision new service: ${provisionResult.error}`);
@@ -233,7 +268,7 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
     setEditingAccount(account);
     setAccountForm({
       label: account.label,
-      token: account.railway_api_token,
+      token: '', // Token is never returned from DB — leave blank, only fill if changing
       projectId: account.railway_project_id,
     });
     setShowAccountPanel(true);
@@ -336,11 +371,10 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
       const tokenId = result.data.token_id;
       const tokenValue = result.data.token_value;
 
-      // Step 2: Provision Railway service on selected account
+      // Step 2: Provision Railway service on selected account (via account ID — no raw token)
       const serviceName = `gkl-${tokenValue.substring(0, 8).toLowerCase()}`;
       const provisionResult = await provisionRailwayService(
-        account.railway_api_token,
-        account.railway_project_id,
+        account.id,
         serviceName
       );
 
@@ -391,18 +425,8 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
       // Step 1: Delete Railway service if one exists for this token
       const serviceInfo = serviceInfoMap[tokenToDelete.id];
       if (serviceInfo?.railway_service_id) {
-        // Lookup account credentials from railway_account_id
-        let apiToken, projectId;
         if (serviceInfo.railway_account_id) {
-          const accResult = await getAccountById(serviceInfo.railway_account_id);
-          if (accResult.success && accResult.data) {
-            apiToken = accResult.data.railway_api_token;
-            projectId = accResult.data.railway_project_id;
-          }
-        }
-
-        if (apiToken && projectId) {
-          const deleteServiceResult = await deleteRailwayService(apiToken, projectId, serviceInfo.railway_service_id);
+          const deleteServiceResult = await deleteRailwayService(serviceInfo.railway_account_id, serviceInfo.railway_service_id);
           if (!deleteServiceResult.success) {
             console.warn('Failed to delete Railway service:', deleteServiceResult.error);
           }
@@ -623,7 +647,7 @@ function TokenGenerator({ onTokenGenerated, onTokenDeleted, refreshTrigger, admi
                   className="railway-input"
                   value={accountForm.token}
                   onChange={(e) => setAccountForm(prev => ({ ...prev, token: e.target.value }))}
-                  placeholder="Enter Railway API token"
+                  placeholder={editingAccount ? 'Leave blank to keep current token' : 'Enter Railway API token'}
                 />
               </div>
               <div className="railway-settings-row">

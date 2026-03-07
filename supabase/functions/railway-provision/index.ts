@@ -1,8 +1,11 @@
 // Supabase Edge Function: railway-provision
 // Creates a new Railway service with Docker image for a token
 //
-// POST body: { "railway_api_token", "railway_project_id", "service_name" }
+// POST body: { "railway_account_id", "service_name" }
+// Fetches credentials from railway_accounts table server-side
 // Returns: { success, service_id, backend_url }
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,20 +33,41 @@ async function railwayGQL(token: string, query: string, variables?: Record<strin
   return json.data;
 }
 
+async function getAccountCredentials(accountId: string) {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    throw new Error("Missing Supabase configuration");
+  }
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const { data, error } = await supabase
+    .from("railway_accounts")
+    .select("railway_api_token, railway_project_id")
+    .eq("id", accountId)
+    .single();
+  if (error || !data) {
+    throw new Error("Railway account not found");
+  }
+  return { token: data.railway_api_token, projectId: data.railway_project_id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { railway_api_token, railway_project_id, service_name } = await req.json();
+    const { railway_account_id, service_name } = await req.json();
 
-    if (!railway_api_token || !railway_project_id || !service_name) {
+    if (!railway_account_id || !service_name) {
       return new Response(
-        JSON.stringify({ success: false, error: "railway_api_token, railway_project_id, and service_name are required" }),
+        JSON.stringify({ success: false, error: "railway_account_id and service_name are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Fetch credentials server-side from DB
+    const { token: railway_api_token, projectId: railway_project_id } = await getAccountCredentials(railway_account_id);
 
     // Step 1: Verify token + project access
     const projectData = await railwayGQL(railway_api_token, `

@@ -341,23 +341,32 @@ export const getSession = () => {
       return null;
     }
 
-    // NO AUTOMATIC EXPIRY CHECKS
-    // Session persists until manual logout or admin revocation
-    // This prevents unexpected logouts on mobile devices
-    
-    // Optional: Log warnings but don't logout
-    const loginTime = new Date(session.login_time);
     const now = new Date();
-    const hoursSinceLogin = (now - loginTime) / (1000 * 60 * 60);
 
-    if (hoursSinceLogin > 24) {
-      console.warn('Session is older than 24 hours, but keeping active');
-    }
-
+    // Enforce subscription expiry — if token_expiry_date has passed, force logout
     if (session.token_expiry_date) {
       const expiryDate = new Date(session.token_expiry_date);
       if (now > expiryDate) {
-        console.warn('Token expiry date passed, but keeping session active');
+        console.warn('Subscription expired, clearing session');
+        logoutUser();
+        return null;
+      }
+    }
+
+    // Enforce session age — if server provided expires_at, use that; otherwise 7-day max
+    if (session.expires_at) {
+      if (now > new Date(session.expires_at)) {
+        console.warn('Session expired (server expiry), clearing');
+        logoutUser();
+        return null;
+      }
+    } else {
+      const loginTime = new Date(session.login_time);
+      const daysSinceLogin = (now - loginTime) / (1000 * 60 * 60 * 24);
+      if (daysSinceLogin > 7) {
+        console.warn('Session older than 7 days, clearing');
+        logoutUser();
+        return null;
       }
     }
 
