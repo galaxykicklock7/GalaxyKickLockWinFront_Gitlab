@@ -1,0 +1,5 @@
+To add code obfuscation, run this command:
+
+npm install --save-dev terser vite-plugin-javascript-obfuscator
+
+Then the vite.config.js will use it automatically.

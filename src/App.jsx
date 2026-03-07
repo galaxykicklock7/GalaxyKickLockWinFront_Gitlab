@@ -449,7 +449,7 @@ function UserApp() {
       const isDeployed = storageManager.getItem('deploymentStatus') === 'deployed';
       if (isDeployed) {
         try {
-          showToast('Stopping backend pipeline...', 'info');
+          showToast('Shutting down system...', 'info');
           const { cancelGitLabPipeline, getLatestRunningGitLabPipeline } = await import('./utils/gitlab');
           const pipelineId = storageManager.getItem('pipelineId') || await getLatestRunningGitLabPipeline();
           if (pipelineId) {
@@ -674,7 +674,7 @@ function UserApp() {
               if (successful > 0) {
                 showToast(`🧠 AI CORE re-enabled for ${successful}/${aiPromises.length} connection(s)`, 'success');
               } else {
-                showToast(`⚠️ Could not re-enable AI CORE (check backend CORS)`, 'warning');
+                showToast(`⚠️ Could not re-enable AI CORE (check connection)`, 'warning');
               }
             }
           }
@@ -685,12 +685,12 @@ function UserApp() {
     } catch (err) {
 
       // Provide more specific error messages
-      let errorMessage = 'Failed to connect to backend';
+      let errorMessage = 'Failed to connect to service';
 
       if (err.message.includes('fetch') || err.message.includes('Network')) {
-        errorMessage = 'Cannot reach backend server. Please check if the server is running.';
+        errorMessage = 'Cannot reach service. Please check your connection.';
       } else if (err.message.includes('timeout')) {
-        errorMessage = 'Connection timeout. Server is not responding.';
+        errorMessage = 'Connection timeout. Service is not responding.';
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -715,7 +715,7 @@ function UserApp() {
       if (err.response?.data) {
         // If backend returns HTML error page, show generic message
         if (typeof err.response.data === 'string' && err.response.data.includes('<!DOCTYPE')) {
-          errorMessage = 'Backend error: The disconnect endpoint crashed. Check backend logs.';
+          errorMessage = 'Service error: The disconnect endpoint crashed. Please try again.';
         } else {
           errorMessage = err.response.data.message || err.response.data;
         }
@@ -747,7 +747,7 @@ function UserApp() {
       const backendUrl = connectionManager.getUrl() || getBackendUrl();
 
       if (!backendUrl) {
-        showToast('Backend not connected', 'error');
+        showToast('Service not connected', 'error');
         setAiCoreEnabled(!newState); // Revert on error
         setAiCoreLoading(false);
         return;

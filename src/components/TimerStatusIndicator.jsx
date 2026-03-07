@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import './TimerStatusIndicator.css';
-import { getSessionToken } from '../utils/auth';
 
 const TimerStatusIndicator = ({ wsNumber, backendUrl, userId }) => {
   const [timerStatus, setTimerStatus] = useState('normal');

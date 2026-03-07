@@ -491,7 +491,7 @@ const MLLearningModal = ({ isOpen, onClose, connectionNumber, backendUrl, userId
                             </span>
                           </td>
                           <td>
-                            <span className={`reason-badge ${data.adjustmentReason?.toLowerCase()}`}>
+                            <span className={`reason-badge ${data.adjustmentReason?.toLowerCase().replace(/^(\d)/, 'error-$1')}`}>
                               {data.adjustmentReason === 'STUCK_ESCAPE' ? '🔧' :
                                data.adjustmentReason === '3S_ERROR' ? '⚠️' :
                                data.adjustmentReason === 'SUCCESS' ? '✅' :

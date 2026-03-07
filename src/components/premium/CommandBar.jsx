@@ -92,8 +92,8 @@ const CommandBar = ({
         if (deploymentStatus === 'deployed') {
             setConfirmModalConfig({
                 title: '⚠️ SYSTEM ALREADY ACTIVE',
-                message: 'You already have an active session running.\n\nStarting a new session will redeploy the backend.\n\nContinue?',
-                confirmText: 'REDEPLOY',
+                message: 'You already have an active session running.\n\nStarting a new session will restart the system.\n\nContinue?',
+                confirmText: 'RESTART',
                 type: 'warning',
                 onConfirm: () => {
                     setShowConfirmModal(false);
@@ -112,7 +112,7 @@ const CommandBar = ({
         setIsDeactivating(false);
         setDeploymentStatus('deploying');
         setShowDeployModal(true);
-        setDeploymentProgress({ percentage: 0, message: 'Initializing deployment...' });
+        setDeploymentProgress({ percentage: 0, message: 'Initializing system...' });
 
         try {
             if (!currentUser || !currentUser.username) {
@@ -122,8 +122,8 @@ const CommandBar = ({
             // Clear old backend URL
             backendStorage.clearBackendUrl();
 
-            // Step 1: Call Edge Function to redeploy Railway (0% → 80%)
-            setDeploymentProgress({ percentage: 10, message: 'Deploying backend to Railway...' });
+            // Step 1: Call Edge Function to redeploy backend (0% → 80%)
+            setDeploymentProgress({ percentage: 10, message: 'Activating system...' });
 
             const result = await activateBackend(currentUser.username);
 
@@ -135,11 +135,11 @@ const CommandBar = ({
             const userId = result.userId;
 
             if (!backendUrl) {
-                throw new Error('No backend URL returned. Contact admin to set up your service.');
+                throw new Error('Service URL not available. Contact admin for assistance.');
             }
 
             // Backend URL is now stored securely (obfuscated)
-            setDeploymentProgress({ percentage: 80, message: 'Backend deployed, verifying health...' });
+            setDeploymentProgress({ percentage: 80, message: 'System online, verifying connection...' });
 
             // Step 2: Health check from frontend (80% → 98%)
             // Edge function already does health check, but verify from browser too (CORS/network)
@@ -165,12 +165,12 @@ const CommandBar = ({
                         }
                         setDeploymentProgress({
                             percentage: 80 + Math.min(18, Math.round((i / maxHealthAttempts) * 18)),
-                            message: `Backend responding HTTP ${healthRes.status}... retrying (${i}/${maxHealthAttempts})`
+                            message: `System responding... retrying (${i}/${maxHealthAttempts})`
                         });
                     } catch {
                         setDeploymentProgress({
                             percentage: 80 + Math.min(18, Math.round((i / maxHealthAttempts) * 18)),
-                            message: `Waiting for backend... (${i}/${maxHealthAttempts})`
+                            message: `Establishing connection... (${i}/${maxHealthAttempts})`
                         });
                     }
                     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -178,7 +178,7 @@ const CommandBar = ({
             }
 
             if (!healthOk) {
-                throw new Error('Backend deployed but not responding. Please try again.');
+                throw new Error('System activated but not responding. Please try again.');
             }
 
             // Save URL and finalize
@@ -207,7 +207,7 @@ const CommandBar = ({
             setDeploymentStatus('failed');
             setDeploymentProgress({
                 percentage: 0,
-                message: error.message || 'Deployment failed. Please try again.'
+                message: error.message || 'Activation failed. Please try again.'
             });
             clearBackendUrl();
             backendStorage.clearBackendUrl();
@@ -275,15 +275,15 @@ const CommandBar = ({
                 }
             }
 
-            // Step 3: Stop Railway backend via Edge Function
-            setDeploymentProgress({ percentage: 40, message: 'Stopping Railway backend...' });
+            // Step 3: Stop backend via Edge Function
+            setDeploymentProgress({ percentage: 40, message: 'Shutting down system...' });
             const stopResult = await deactivateBackend(currentUser?.username);
 
             if (stopResult.success) {
-                setDeploymentProgress({ percentage: 90, message: 'Backend stopped...' });
+                setDeploymentProgress({ percentage: 90, message: 'System offline...' });
             } else {
                 console.warn('Stop failed:', stopResult.error);
-                setDeploymentProgress({ percentage: 80, message: 'Stop signal sent...' });
+                setDeploymentProgress({ percentage: 80, message: 'Shutdown signal sent...' });
             }
 
             setDeploymentProgress({ percentage: 100, message: 'System deactivated successfully!' });
