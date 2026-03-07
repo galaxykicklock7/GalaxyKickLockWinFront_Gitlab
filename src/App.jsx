@@ -196,7 +196,7 @@ function UserApp() {
     disconnect,
     updateConfig,
     sendCommand
-  } = useBackendStatus();
+  } = useBackendStatus(storageReady);
 
   const showToast = useCallback((message, type = 'error') => {
     setToast({ message, type });

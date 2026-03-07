@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../utils/api';
 import { storageManager } from '../utils/storageManager';
 
-export const useBackendStatus = () => {
+export const useBackendStatus = (storageReady = false) => {
   const [status, setStatus] = useState(null);
   const [logs, setLogs] = useState({ log1: [], log2: [], log3: [], log4: [], log5: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [connected, setConnected] = useState(false);
+  // Initialize connected state from storage
+  const [connected, setConnected] = useState(() => {
+    return storageManager.getItem('wsConnected') === 'true';
+  });
   const consecutiveFailures = useRef(0);
   const pollingIntervalRef = useRef(null);
   const autoReconnectAttempted = useRef(false);
@@ -83,6 +86,17 @@ export const useBackendStatus = () => {
       fetchLogsInflight.current = false;
     }
   }, []);
+
+  // Restore connection state from storage after mount
+  useEffect(() => {
+    if (!storageReady) return;
+    
+    const wasConnected = storageManager.getItem('wsConnected') === 'true';
+    if (wasConnected) {
+      setConnected(true);
+      console.log('✅ Restored connection state from storage');
+    }
+  }, [storageReady]);
 
   // Efficient polling - only when deployed
   useEffect(() => {
