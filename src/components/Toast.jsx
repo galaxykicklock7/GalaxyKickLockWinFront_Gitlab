@@ -26,7 +26,7 @@ const Toast = ({ message, type = 'error', onClose }) => {
   return (
     <div className={`toast toast-${type}`}>
       <span className="toast-icon">
-        {type === 'error' ? '⚠️' : type === 'success' ? '✓' : 'ℹ️'}
+        {type === 'error' ? '⚠️' : type === 'success' ? '✓' : type === 'warning' ? '⚠️' : 'ℹ️'}
       </span>
       <span className="toast-message">{message}</span>
       <button className="toast-close" onClick={onClose}>×</button>

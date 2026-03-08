@@ -7,10 +7,7 @@ export const useBackendStatus = (storageReady = false) => {
   const [logs, setLogs] = useState({ log1: [], log2: [], log3: [], log4: [], log5: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Initialize connected state from storage
-  const [connected, setConnected] = useState(() => {
-    return storageManager.getItem('wsConnected') === 'true';
-  });
+  const [connected, setConnected] = useState(false);
   const consecutiveFailures = useRef(0);
   const pollingIntervalRef = useRef(null);
   const autoReconnectAttempted = useRef(false);
@@ -48,7 +45,7 @@ export const useBackendStatus = (storageReady = false) => {
         storageManager.setItem('wsConnected', 'false');
       }
       if (consecutiveFailures.current >= 10) {
-        console.warn('⚠️ Backend unreachable for 10 seconds, but keeping deployment active');
+        // Backend unreachable — stop polling to save resources
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
@@ -75,7 +72,7 @@ export const useBackendStatus = (storageReady = false) => {
       if (err.code === 'NETWORK_ERROR') {
         consecutiveFailures.current++;
         if (consecutiveFailures.current >= 10) {
-          console.warn('⚠️ Backend unreachable for 10 seconds, but keeping deployment active');
+          // Backend unreachable — stop polling to save resources
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
@@ -94,19 +91,19 @@ export const useBackendStatus = (storageReady = false) => {
     const wasConnected = storageManager.getItem('wsConnected') === 'true';
     if (wasConnected) {
       setConnected(true);
-      console.log('✅ Restored connection state from storage');
     }
   }, [storageReady]);
 
   // Efficient polling - only when deployed
   useEffect(() => {
+    if (!storageReady) return;
+
     // Check if backend is deployed
     const checkDeploymentAndPoll = () => {
       const isDeployed = storageManager.getItem('deploymentStatus') === 'deployed';
-      
+
       if (!isDeployed) {
         setLoading(false);
-        setConnected(false);
         return null;
       }
 
@@ -157,7 +154,7 @@ export const useBackendStatus = (storageReady = false) => {
       }
       window.removeEventListener('deploymentStatusChanged', handleDeploymentChange);
     };
-  }, [fetchStatus, fetchLogs]);
+  }, [storageReady, fetchStatus, fetchLogs]);
 
   const connect = useCallback(async () => {
     try {
@@ -205,7 +202,7 @@ export const useBackendStatus = (storageReady = false) => {
       const result = await apiClient.configure(config);
       return result;
     } catch (err) {
-      console.error('updateConfig error:', err);
+      // updateConfig error — propagated via throw
       setError(err.message);
       throw err;
     }

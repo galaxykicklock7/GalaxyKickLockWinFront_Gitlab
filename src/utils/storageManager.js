@@ -8,7 +8,6 @@
 // Map of logical keys to obfuscated keys
 const KEY_MAP = {
   'galaxyKickLockSession': '_s1',
-  'railwayBackendUrl': '_e2',
   'backendUrl': '_e2',
   'adminSession': '_s2',
   'galaxyKickLockConfig': '_c1',
@@ -24,7 +23,8 @@ const KEY_MAP = {
   'svc_endpoint': '_e3',
   'userId': '_u1',
   'rememberedUsername': '_r1',
-  'userSession': '_s2'
+  'userSession': '_s2',
+  'wsConnected': '_w1'
 };
 
 // Reverse mapping

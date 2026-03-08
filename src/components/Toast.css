@@ -38,6 +38,12 @@
   color: white;
 }
 
+.toast-warning {
+  background-color: rgba(255, 152, 0, 0.95);
+  border: 1px solid #ff9800;
+  color: white;
+}
+
 .toast-info {
   background-color: rgba(33, 150, 243, 0.95);
   border: 1px solid #2196F3;

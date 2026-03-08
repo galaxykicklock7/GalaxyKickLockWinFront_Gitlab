@@ -175,13 +175,18 @@ function UserApp() {
     }
   }, [storageReady]);
   
-  // AI CORE state
-  const [aiCoreEnabled, setAiCoreEnabled] = useState(() => {
-    // Restore from localStorage on mount
-    const saved = storageManager.getItem('aiCoreEnabled');
-    return saved === 'true';
-  });
+  // AI CORE state — restored after storageReady
+  const [aiCoreEnabled, setAiCoreEnabled] = useState(false);
   const [aiCoreLoading, setAiCoreLoading] = useState(false);
+
+  // Restore AI Core state from storage after initialization
+  useEffect(() => {
+    if (!storageReady) return;
+    const saved = storageManager.getItem('aiCoreEnabled');
+    if (saved === 'true') {
+      setAiCoreEnabled(true);
+    }
+  }, [storageReady]);
 
   // Dashboard/logs enabled when deployed OR in local test mode
   const [isDashboardEnabled, setIsDashboardEnabled] = useState(false);
@@ -252,9 +257,7 @@ function UserApp() {
     setIsDashboardEnabled(deploymentStatus === 'deployed' || localTestMode === 'true');
 
     // Initialize connection manager on app startup
-    backendStorage.initializeConnectionManager().catch(err => {
-      console.error('Failed to initialize connection manager:', err);
-    });
+    backendStorage.initializeConnectionManager().catch(() => {});
 
     // Generate unique tab ID for this tab (only once on mount)
     const tabId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

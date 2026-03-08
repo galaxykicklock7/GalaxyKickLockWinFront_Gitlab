@@ -35,7 +35,12 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
         activeTab = 'KICK';
     }
 
-    // Map each field to its "opposite" list for cross-list duplicate detection
+    // onChange: just save the value, no validation while typing
+    const handleTargetChange = useCallback((field, value) => {
+        onConfigChange(field, value);
+    }, [onConfigChange]);
+
+    // Opposite list within the same tab only (blacklist↔whitelist, not cross-tab)
     const getOppositeField = (field) => {
         const opposites = {
             blacklist: 'whitelist', whitelist: 'blacklist',
@@ -46,19 +51,17 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
         return opposites[field] || null;
     };
 
-    const getFieldLabel = (field) => {
-        if (field.startsWith('kgang')) return `KICK CLANS ${field.includes('white') ? 'WHITELIST' : 'BLACKLIST'}`;
-        if (field.startsWith('gang')) return `IMPRISON CLANS ${field.includes('white') ? 'WHITELIST' : 'BLACKLIST'}`;
-        if (field.startsWith('k')) return `KICK ${field.includes('white') ? 'WHITELIST' : 'BLACKLIST'}`;
-        return `IMPRISON ${field.includes('white') ? 'WHITELIST' : 'BLACKLIST'}`;
+    const getFullLabel = (field) => {
+        const isWhite = field.includes('white');
+        const listType = isWhite ? 'WHITELIST' : 'BLACKLIST';
+        const isClan = field.includes('gang');
+        const section = isClan ? 'CLANS' : 'USERNAMES';
+        const isKick = field.startsWith('k');
+        const tab = isKick ? 'KICK' : 'IMPRISON';
+        return `${tab} ${section} ${listType}`;
     };
 
-    // onChange: just save the value, no validation while typing
-    const handleTargetChange = useCallback((field, value) => {
-        onConfigChange(field, value);
-    }, [onConfigChange]);
-
-    // onBlur: validate all entries once user leaves the field
+    // onBlur: validate entries — block own username/codes, warn+remove if in opposite list, auto-remove duplicates
     const handleTargetBlur = useCallback((field, value) => {
         const currentUsername = currentUsernameRef.current;
         const allCodes = [
@@ -67,8 +70,18 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
             config.kickrc
         ].filter(code => code && code.trim()).map(code => code.toLowerCase());
 
+        const oppositeField = getOppositeField(field);
+        const oppositeSet = new Set();
+        if (oppositeField) {
+            (config[oppositeField] || '').split(/[\n,]/).map(s => s.trim().toLowerCase()).filter(s => s)
+                .forEach(s => oppositeSet.add(s));
+        }
+
         const entries = value.split(/[\n,]/).map(t => t.trim()).filter(t => t);
         const seen = new Set();
+        const unique = [];
+        const removed = [];
+        const crossConflicts = [];
 
         for (const target of entries) {
             const lowerTarget = target.toLowerCase();
@@ -83,22 +96,38 @@ const SecurityDatabase = ({ config, onConfigChange, showToast }) => {
                 return;
             }
 
-            const oppositeField = getOppositeField(field);
-            if (oppositeField) {
-                const oppositeList = (config[oppositeField] || '').split(/[\n,]/).map(s => s.trim().toLowerCase()).filter(s => s);
-                if (oppositeList.includes(lowerTarget)) {
-                    if (showToast) showToast(`"${target}" already exists in ${getFieldLabel(oppositeField)}`, 'warning');
-                    return;
-                }
+            // Check if name exists in opposite list (blacklist↔whitelist within same tab)
+            if (oppositeSet.has(lowerTarget)) {
+                crossConflicts.push(target);
+                continue;
             }
 
             if (seen.has(lowerTarget)) {
-                if (showToast) showToast(`"${target}" is a duplicate entry`, 'warning');
-                return;
+                removed.push(target);
+            } else {
+                seen.add(lowerTarget);
+                unique.push(target);
             }
-            seen.add(lowerTarget);
         }
-    }, [config, showToast]);
+
+        let changed = false;
+
+        if (crossConflicts.length > 0) {
+            const label = getFullLabel(oppositeField);
+            if (showToast) showToast(`${crossConflicts.join(', ')} already in ${label} — removed from ${getFullLabel(field)}`, 'warning');
+            changed = true;
+        }
+
+        if (removed.length > 0) {
+            const label = getFullLabel(field);
+            if (showToast) showToast(`Removed duplicate${removed.length > 1 ? 's' : ''} from ${label}: ${removed.join(', ')}`, 'info');
+            changed = true;
+        }
+
+        if (changed) {
+            onConfigChange(field, unique.join('\n'));
+        }
+    }, [config, showToast, onConfigChange]);
 
     return (
         <div className="hud-panel security-db">
